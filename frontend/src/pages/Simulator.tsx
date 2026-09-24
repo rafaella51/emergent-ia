@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Send } from "lucide-react";
-import { apiPost } from "@/lib/api";
-import type { Conversation, ConversationDetail, Message } from "@/lib/types";
+import { Copy, Send } from "lucide-react";
+import { apiGet, apiPost } from "@/lib/api";
+import type { Conversation, ConversationDetail, Message, TwilioStatus } from "@/lib/types";
 import { STATUS_CLASS, STATUS_LABEL } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,12 @@ export default function Simulator() {
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
+
+  const twilio = useQuery({
+    queryKey: ["twilio-status"],
+    queryFn: () => apiGet<TwilioStatus>("/twilio/status"),
+    retry: false,
+  });
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["conversations"] });
@@ -56,6 +62,42 @@ export default function Simulator() {
         O envio real pelo WhatsApp (Twilio) está SIMULADO nesta versão — as mensagens entram
         no mesmo funil, com a IA respondendo de verdade.
       </p>
+
+      <Card className="mb-6" data-testid="twilio-status-card">
+        <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6">
+          <div className="flex items-center gap-2">
+            <span
+              className={`size-2.5 rounded-full ${twilio.data?.configured ? "animate-pulse bg-primary" : "bg-[#f87171]"}`}
+              data-testid="twilio-status-dot"
+            />
+            <span className="text-sm font-medium" data-testid="twilio-status-label">
+              {twilio.data?.configured ? "WhatsApp real conectado (Twilio)" : "WhatsApp real não configurado"}
+            </span>
+            <Badge className="bg-secondary text-secondary-foreground">
+              {twilio.data?.from_number ?? "—"}
+            </Badge>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="sqb-label text-muted-foreground">Webhook pra colar no Twilio (When a message comes in)</p>
+            <div className="mt-1 flex items-center gap-2">
+              <code className="truncate rounded bg-secondary/60 px-2 py-1 font-mono text-xs" data-testid="twilio-webhook-url">
+                {twilio.data?.webhook_url ?? ""}
+              </code>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                data-testid="copy-webhook-button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(twilio.data?.webhook_url ?? "");
+                  toast.success("Webhook copiado");
+                }}
+              >
+                <Copy className="size-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-12">
         <Card className="lg:col-span-4">

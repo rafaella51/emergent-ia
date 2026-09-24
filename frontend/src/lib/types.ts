@@ -65,6 +65,12 @@ export interface AuthState {
   authenticated: boolean;
 }
 
+export interface TwilioStatus {
+  configured: boolean;
+  from_number: string;
+  webhook_url: string;
+}
+
 export interface FollowupResult {
   sent: number;
   lost: number;

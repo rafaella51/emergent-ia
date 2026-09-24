@@ -28,6 +28,11 @@ POST /followups/run · GET /notifications · GET/PUT /playbook · GET /metrics �
 5. Follow-up: POST /followups/run → 24h sem resposta manda mensagem, 72h marca perdido.
 
 ## Deviations (intencionais)
-- WhatsApp (Twilio), Google Calendar e e-mail (Resend) são SIMULADOS. Nada sai do pod.
+- Google Calendar e e-mail (Resend) são SIMULADOS. Nada sai do pod.
+- WhatsApp via **Twilio REAL** (sandbox): webhook público `POST /api/twilio/whatsapp/incoming`
+  (validado por X-Twilio-Signature, HMAC-SHA1 manual em lib/twilio_client.py), registra o lead
+  como conversa `channel=whatsapp` sem resposta automática do bot (modo receber-e-registrar).
+  Respostas manuais (role=human) no inbox são enviadas de verdade via Twilio REST.
+  GET `/api/twilio/status` mostra config. Env: TWILIO_ACCOUNT_SID/AUTH_TOKEN/WHATSAPP_FROM/WEBHOOK_URL.
 - Realtime via polling do react-query (6–15s), não WebSocket.
 - Instagram DM é Fase 2 (campo `channel` já existe e aparece nos seeds).

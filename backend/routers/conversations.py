@@ -113,6 +113,16 @@ async def post_message(conversation_id: str, payload: MessageCreate):
     await _insert_message(conversation_id, payload.role, text)
     update: dict = {"last_message": text, "updated_at": now_utc()}
 
+    # Resposta manual do atendente vai de verdade pro WhatsApp do lead (se Twilio configurado).
+    if payload.role == "human" and conv.channel == "whatsapp":
+        from lib import twilio_client
+
+        if twilio_client.is_configured() and conv.phone.strip().startswith("+"):
+            try:
+                await twilio_client.send_whatsapp(conv.phone, text)
+            except Exception:  # noqa: BLE001 — falha de envio não pode derrubar o painel
+                update["handoff_reason"] = "falha ao enviar via WhatsApp (verifique o sandbox/janela 24h)"
+
     if payload.role == "lead" and not conv.bot_paused:
         playbook = await _playbook()
         history_docs = await db.messages.find({"conversation_id": conversation_id}).sort("created_at", 1).to_list(200)
