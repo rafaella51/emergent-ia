@@ -1,0 +1,193 @@
+{
+  "project_title": "Sales Qualifier Bot — WhatsApp + Instagram DM (Painel Web em Português)",
+  "app_type": "dashboard",
+  "theme_preference": "dark_default_with_tactical_precision",
+  "typography": {
+    "font_family_heading": "Outfit Variable, sans-serif",
+    "font_family_body": "Plus Jakarta Sans Variable, sans-serif",
+    "font_family_mono": "JetBrains Mono Variable, monospace",
+    "import_font_css": "@import \"@fontsource-variable/outfit\";\n@import \"@fontsource-variable/plus-jakarta-sans\";\n@import \"@fontsource-variable/jetbrains-mono\";",
+    "scale_px": {
+      "display": 52,
+      "h1": 38,
+      "h2": 28,
+      "h3": 20,
+      "body": 15,
+      "caption": 13
+    },
+    "hierarchy_rules": "Tight tracking on headers (tracking-tight), crisp micro-labels uppercase tracking-[0.18em]. Body copy readable with 1.6 line height."
+  },
+  "colors": {
+    "palette_name": "Emerald & Obsidian Tactical AI",
+    "accent": "#10B981",
+    "on_accent": "#022C22",
+    "surfaces": [
+      {
+        "name": "page",
+        "kind": "solid",
+        "bg": "#090D14",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "link": "#34D399",
+          "error": "#F87171",
+          "success": "#34D399",
+          "warning": "#FBBF24"
+        }
+      },
+      {
+        "name": "sidebar",
+        "kind": "solid",
+        "bg": "#0D131F",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#64748B",
+        "roles": {
+          "active_indicator": "#10B981",
+          "badge_count": "#10B981"
+        }
+      },
+      {
+        "name": "card_panel",
+        "kind": "solid",
+        "bg": "#111827",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "border": "#1F2937",
+          "border_hover": "#374151"
+        }
+      },
+      {
+        "name": "chat_bubble_bot",
+        "kind": "solid",
+        "bg": "#1E293B",
+        "on_bg": "#F1F5F9",
+        "on_bg_muted": "#94A3B8"
+      },
+      {
+        "name": "chat_bubble_lead",
+        "kind": "solid",
+        "bg": "#064E3B",
+        "on_bg": "#ECFDF5",
+        "on_bg_muted": "#A7F3D0"
+      },
+      {
+        "name": "chat_bubble_human",
+        "kind": "solid",
+        "bg": "#1E1B4B",
+        "on_bg": "#EEF2FF",
+        "on_bg_muted": "#C7D2FE"
+      },
+      {
+        "name": "badge_qualificando",
+        "kind": "solid",
+        "bg": "#1E3A5F",
+        "on_bg": "#93C5FD",
+        "on_bg_muted": "#60A5FA"
+      },
+      {
+        "name": "badge_agendado",
+        "kind": "solid",
+        "bg": "#064E3B",
+        "on_bg": "#6EE7B7",
+        "on_bg_muted": "#34D399"
+      },
+      {
+        "name": "badge_novo",
+        "kind": "solid",
+        "bg": "#312E81",
+        "on_bg": "#C7D2FE",
+        "on_bg_muted": "#818CF8"
+      },
+      {
+        "name": "badge_perdido",
+        "kind": "solid",
+        "bg": "#450A0A",
+        "on_bg": "#FCA5A5",
+        "on_bg_muted": "#F87171"
+      },
+      {
+        "name": "header_glass",
+        "kind": "glass",
+        "contrast_against": "#090D14",
+        "guarantee": "backdrop-blur-xl bg-[#090D14]/80 border-b border-slate-800/80",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8"
+      }
+    ]
+  },
+  "entry_surfaces": {
+    "/login": "split PIN authorization gate with live AI status monitor panel on left and keypad form on right",
+    "/": "full tactical dashboard with live metric cards, active conversation stream and quick simulator",
+    "/inbox": "three-column WhatsApp-style conversation center with lead filtering, active thread transcript, and lead profile inspector",
+    "/simulator": "interactive live WhatsApp & Instagram DM lead emulator with real-time qualifier bot inspection",
+    "/prompt-editor": "playbook editor with prompt variables, pricing rules (R$497 / R$250 minimums) and handoff trigger toggles",
+    "/leads": "sortable data-table of all captured leads with qualification scoring, status tagging, and CSV exporter"
+  },
+  "grids_and_layouts": {
+    "dashboard_grid": "grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6",
+    "inbox_split": "h-[calc(100vh-4.5rem)] grid grid-cols-1 md:grid-cols-12 gap-0 border border-slate-800 rounded-xl overflow-hidden bg-slate-900/50",
+    "inbox_col_leads": "md:col-span-4 lg:col-span-3 border-r border-slate-800 flex flex-col",
+    "inbox_col_chat": "md:col-span-8 lg:col-span-6 border-r border-slate-800 flex flex-col bg-slate-950/70",
+    "inbox_col_details": "hidden lg:flex lg:col-span-3 flex-col bg-slate-900/40 p-4 overflow-y-auto",
+    "simulator_split": "grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
+  },
+  "motion_and_interactions": {
+    "transitions": "transition-colors duration-150 ease-out, transition-opacity duration-150 ease-out, transition-transform duration-150 ease-out",
+    "live_pulse": "animate-pulse for active online bots & incoming live messages",
+    "reduced_motion": "respect prefers-reduced-motion: reduce animation speeds to zero"
+  },
+  "key_features_and_components": {
+    "pin_auth": {
+      "component": "src/pages/Login.tsx",
+      "default_pin": "1234",
+      "description": "PIN de acesso rápido seguro (4 dígitos) com feedback sonoro/visual e persistência de sessão."
+    },
+    "metrics_overview": {
+      "component": "src/components/dashboard/MetricsCards.tsx",
+      "cards": [
+        {"title": "Total de Leads", "metric": "total_leads", "trend": "+24% hoje"},
+        {"title": "Taxa de Qualificação", "metric": "qualification_rate", "trend": "68.4% com score > 70"},
+        {"title": "Calls Agendadas (Google Cal)", "metric": "scheduled_calls", "trend": "14 agendamentos confirmados"},
+        {"title": "Tempo Médio de Resposta", "metric": "avg_response_time", "trend": "1.8 segundos com IA"}
+      ]
+    },
+    "inbox_chat": {
+      "component": "src/pages/Inbox.tsx",
+      "channels": ["WhatsApp", "Instagram DM"],
+      "status_badges": ["novo", "qualificando", "agendado", "perdido"],
+      "human_handoff_toggle": "Botão 'Assumir conversa' (pausa IA) / 'Devolver ao Bot' (retoma IA)",
+      "manual_message_input": "Campo para atendente humano enviar mensagens direto pro canal"
+    },
+    "services_pricing_rules": {
+      "sites_novos": "A partir de R$ 497,00 (nunca fechar valor final na conversa, agendar call de alinhamento)",
+      "google_meu_negocio": "A partir de R$ 250,00 (otimização completa e ranqueamento local)",
+      "rule_enforcement": "O bot explica o valor inicial 'a partir de' para ancoragem e conduz o lead para a call de diagnóstico"
+    },
+    "handoff_triggers": {
+      "trigger_1": "Pedido explícito para falar com atendente humano",
+      "trigger_2": "Perguntas complexas fora do escopo ou objeções repetidas 3x",
+      "trigger_3": "Lead de alto valor com orçamento imediato querendo fechar agora"
+    },
+    "lead_simulator": {
+      "component": "src/pages/Simulator.tsx",
+      "description": "Simula um lead mandando mensagem pelo WhatsApp ou Instagram Direct com preview do raciocínio da IA, qualificação automática e link para agendamento Google Calendar"
+    },
+    "prompt_playbook_editor": {
+      "component": "src/pages/PromptEditor.tsx",
+      "description": "Editor do system prompt do bot, temperatura da IA, frases de ancoragem de preço e gatilhos de transbordo humano"
+    },
+    "leads_export_table": {
+      "component": "src/pages/Leads.tsx",
+      "description": "Tabela de leads com filtros por canal (WhatsApp/Instagram), serviço de interesse, score de qualificação e botão 'Exportar CSV'"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Construir toda a interface em Português do Brasil (PT-BR) com layout moderno, dark theme com toques de esmeralda (#10B981) e alta densidade de dados.",
+    "Implementar o backend em FastAPI (backend/server.py e routers) com MongoDB para persistência de leads, mensagens, configurações de prompt, métricas e sessões.",
+    "Criar seed script em backend/seed.py populando pelo menos 15 conversas realistas no WhatsApp e Instagram DM com status variados (novo, qualificando, agendado, perdido), orçamentos de Criação de Sites (a partir de R$497) e Google Meu Negócio (a partir de R$250).",
+    "Garantir data-testid em todos os botões principais, inputs de PIN, filtros de status, botões de assumir conversa e exportar CSV.",
+    "Integrar simulação com IA inteligente (FastAPI gera respostas inteligentes de vendas respeitando as regras de ancoragem de preço e agendamento).",
+    "Adicionar Toaster com 'sonner' no canto inferior direito para notificações de novo lead e call agendada."
+  ]
+}
