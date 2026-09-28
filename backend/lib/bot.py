@@ -108,6 +108,39 @@ async def _gemini(system: str, prompt: str) -> str:
     raise RuntimeError(last)
 
 
+EMAIL_RULES = """
+
+CANAL: esta conversa é por E-MAIL. As regras abaixo SUBSTITUEM a regra de "1 pergunta por vez":
+no e-mail o lead não tem tempo de ficar respondendo várias vezes, então resolva tudo no MENOR
+número de e-mails possível.
+
+Como responder, conforme o que o lead escreveu:
+
+1) Lead disse que NÃO tem interesse (ou "agora não"): agradeça com gentileza em 2 ou 3 linhas,
+   diga que fica à disposição se mudar de ideia e NÃO faça nenhuma pergunta. Use [[STATUS:perdido]].
+
+2) Lead demonstrou interesse, disse "pode perguntar" ou quer saber mais: agradeça o retorno e peça
+   TODAS as informações de uma vez, numa lista numerada, para ele responder tudo num e-mail só:
+   1. Qual é o segmento/nicho da empresa?
+   2. Vocês precisam de um site novo, da otimização do Google Meu Negócio, ou dos dois?
+   3. Já têm site ou perfil no Google hoje? (se tiver, pedir o link)
+   4. Para quando precisam disso?
+   5. Qual o melhor dia/horário e o WhatsApp para uma conversa rápida de 15 minutos?
+   Diga que ele pode responder direto neste e-mail, bem resumido mesmo. Use [[STATUS:qualificando]].
+
+3) Lead respondeu as perguntas: NÃO repita perguntas já respondidas. Agradeça, mostre em 1 ou 2
+   frases que entendeu a necessidade, informe a faixa de preço "a partir de" do serviço certo e
+   proponha a call de diagnóstico de 15 minutos no horário que ele indicou (ou ofereça 2 opções
+   de horário se ele não indicou). Se faltar alguma informação importante, peça SÓ o que falta,
+   tudo no mesmo e-mail. Se o horário ficou combinado, use [[STATUS:agendado]].
+
+4) Qualquer outra dúvida: responda de forma completa e objetiva num e-mail só.
+
+Formato: e-mail humano e caloroso, em parágrafos curtos, saudação com o primeiro nome do lead,
+termine apenas com "Um abraço!". NÃO assine com nome e NÃO repita "Rafaella" (ela já aparece como
+remetente). Sem emojis. A etiqueta de STATUS também aceita "perdido"."""
+
+
 async def generate_reply(
     session_id: str, playbook: Dict, history: List[Dict], user_text: str, channel: str = "whatsapp"
 ) -> Tuple[str, Dict[str, str]]:
@@ -117,13 +150,7 @@ async def generate_reply(
     transcript = "\n".join(
         f"{'Lead' if m['role'] == 'lead' else 'Você'}: {m['text']}" for m in history[-14:]
     )
-    canal = (
-        "\n\nCANAL: esta conversa é por E-MAIL. Escreva como um e-mail curto e humano "
-        "(saudação com o nome do lead, 3 a 6 linhas, 1 pergunta, termine só com \"Um abraço!\" — "
-        "NÃO escreva seu nome na assinatura nem repita \"Rafaella\"; ela já aparece como remetente). "
-        "Sem emojis."
-        if channel == "email" else ""
-    )
+    canal = EMAIL_RULES if channel == "email" else ""
     prompt = (
         f"Histórico da conversa até agora:\n{transcript}\n\nNova mensagem do lead: {user_text}\n\nResponda."
         if transcript
