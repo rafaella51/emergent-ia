@@ -92,3 +92,5 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+frontend/dist/
+.vercel
