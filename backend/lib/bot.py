@@ -62,24 +62,50 @@ def keyword_handoff(text: str, keywords: List[str]) -> bool:
     return any(k.strip().lower() in low for k in keywords if k.strip())
 
 
+FALLBACK_MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash"]
+
+
 async def _gemini(system: str, prompt: str) -> str:
-    """Chamada direta à API do Gemini (Google AI Studio) — sem SDK, só httpx."""
+    """Chama o Gemini (Google AI Studio) só com httpx.
+
+    - A chave vai no cabeçalho (nunca na URL, pra não aparecer nos logs).
+    - Se o Google responder "ocupado" (429/500/503), espera um pouco e tenta de novo,
+      trocando de modelo se precisar.
+    """
+    import asyncio
+    import logging
+
     import httpx
 
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     key = os.environ.get("GEMINI_API_KEY", "").strip()
-    model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest").strip()
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    first = os.environ.get("GEMINI_MODEL", "").strip()
+    models = [m for m in ([first] if first else []) + FALLBACK_MODELS]
+    models = list(dict.fromkeys(models))
     body = {
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 600},
     }
+    last = "sem resposta"
     async with httpx.AsyncClient(timeout=40) as client:
-        resp = await client.post(url, params={"key": key}, json=body)
-    resp.raise_for_status()
-    data = resp.json()
-    parts = data["candidates"][0]["content"]["parts"]
-    return "".join(p.get("text", "") for p in parts)
+        for model in models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            for attempt in range(2):
+                resp = await client.post(url, headers={"x-goog-api-key": key}, json=body)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    parts = data["candidates"][0]["content"]["parts"]
+                    return "".join(p.get("text", "") for p in parts)
+                last = f"{model}: HTTP {resp.status_code} {resp.text[:160]}"
+                logging.getLogger(__name__).warning("Gemini falhou — %s", last)
+                if resp.status_code in (429, 500, 502, 503, 504):
+                    await asyncio.sleep(1.5 * (attempt + 1))
+                    continue
+                if resp.status_code == 404:
+                    break  # modelo não existe: tenta o próximo
+                raise RuntimeError(last)  # chave inválida etc.: não adianta insistir
+    raise RuntimeError(last)
 
 
 async def generate_reply(
@@ -93,7 +119,9 @@ async def generate_reply(
     )
     canal = (
         "\n\nCANAL: esta conversa é por E-MAIL. Escreva como um e-mail curto e humano "
-        "(saudação com o nome, 2 a 5 linhas, 1 pergunta, assine como Rafaella). Sem emojis em excesso."
+        "(saudação com o nome do lead, 3 a 6 linhas, 1 pergunta, termine só com \"Um abraço!\" — "
+        "NÃO escreva seu nome na assinatura nem repita \"Rafaella\"; ela já aparece como remetente). "
+        "Sem emojis."
         if channel == "email" else ""
     )
     prompt = (
@@ -102,13 +130,11 @@ async def generate_reply(
         else f"Primeira mensagem do lead: {user_text}\n\nResponda."
     )
     system = build_system_prompt(playbook) + canal
-    last_exc: Exception | None = None
-    for _ in range(2):  # uma tentativa + um retry para falhas transitórias
-        try:
-            return parse_tags(await _gemini(system, prompt))
-        except Exception as exc:  # noqa: BLE001
-            last_exc = exc
+    try:
+        return parse_tags(await _gemini(system, prompt))
+    except Exception as exc:  # noqa: BLE001
+        motivo = str(exc)[:80] or type(exc).__name__
     return (
         "Desculpa, tive um problema técnico aqui. Já estou chamando um humano pra te atender.",
-        {"HANDOFF": f"sim:erro de IA ({type(last_exc).__name__})"},
+        {"HANDOFF": f"sim:erro de IA ({motivo})"},
     )
