@@ -249,8 +249,8 @@ FOLLOWUP_TEXT = {
         "Última mensagem por aqui, prometo 🙂 Se agora não for o momento, um 'agora não' resolve — não vou insistir.",
     ],
     "email": [
-        "Oi, {nome}! Só retomando minha pergunta rápida sobre a presença de vocês no Google. Posso te perguntar?\n\nRafaella",
-        "Oi, {nome}! Último contato por aqui, prometo. Se agora não for o momento, um \"agora não\" resolve — não vou insistir.\n\nRafaella",
+        "Olá, {nome}, tudo bem?\n\nSei que a rotina é corrida, então vou ser breve: te escrevi há alguns dias sobre a presença de vocês no Google. Um perfil completo e um site bem feito costumam ser o que faz o cliente escolher uma empresa em vez da outra na hora da pesquisa.\n\nFaz sentido conversarmos 15 minutos sobre isso esta semana?\n\nUm abraço!",
+        "Olá, {nome}!\n\nEsse é meu último contato por aqui, prometo. Se em algum momento vocês quiserem atrair mais clientes pelo Google, é só responder este e-mail que eu te mostro o caminho, sem compromisso.\n\nE se agora não for o momento, um \"agora não\" resolve — não vou insistir.\n\nUm abraço!",
     ],
 }
 

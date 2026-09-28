@@ -21,12 +21,22 @@ router = APIRouter(prefix="/email", tags=["email"])
 
 DEFAULT_OPENER = (
     "Olá, {nome}, tudo bem?\n\n"
-    "Sou a Rafaella. Encontrei a {empresa} pesquisando negócios na região e queria te fazer "
-    "uma pergunta rápida sobre a presença de vocês no Google.\n\n"
-    "Posso te perguntar?\n\n"
-    "Rafaella"
+    "Encontrei a {empresa} pesquisando negócios aqui da região e resolvi te escrever, porque "
+    "reparei em algo que pode estar fazendo vocês perderem clientes sem perceber.\n\n"
+    "Hoje, antes de ligar ou fazer uma visita, quase todo mundo pesquisa no Google — e decide em "
+    "poucos segundos com base no que aparece ali: fotos, avaliações, horário de funcionamento e um "
+    "site que explique bem o que a empresa faz. Quando essas informações estão incompletas ou "
+    "desatualizadas, o cliente simplesmente escolhe a próxima opção da lista.\n\n"
+    "Sou a Rafaella e trabalho justamente com isso: crio sites e landing pages profissionais e "
+    "otimizo o perfil no Google Meu Negócio, para que empresas como a {empresa} sejam encontradas, "
+    "passem confiança e recebam mais contatos pelo WhatsApp e pelo telefone.\n\n"
+    "Por isso, queria te fazer uma pergunta rápida: hoje, atrair mais clientes pela internet é uma "
+    "prioridade para vocês?\n\n"
+    "Se for, posso te mostrar em uma conversa de 15 minutos o que dá pra melhorar logo de cara, sem "
+    "compromisso. E se agora não for o momento, um \"agora não\" resolve — não vou insistir.\n\n"
+    "Um abraço!"
 )
-DEFAULT_SUBJECT = "Pergunta rápida sobre a {empresa}"
+DEFAULT_SUBJECT = "{empresa} no Google: uma pergunta rápida"
 
 
 @router.get("/status")
