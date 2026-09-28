@@ -95,7 +95,7 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
 async def check_inbox_job() -> dict:
     """Lê respostas dos leads no Gmail, roda o bot e responde por e-mail."""
     leads = await db.conversations.find(
-        {"channel": "email", "status": {"$ne": "perdido"}}, {"email": 1}
+        {"channel": "email"}, {"email": 1}  # inclui "perdido": se ele voltar a responder, o bot atende
     ).to_list(2000)
     replies = await email_client.fetch_replies([d.get("email", "") for d in leads])
     answered = 0
