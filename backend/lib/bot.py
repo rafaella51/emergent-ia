@@ -85,7 +85,7 @@ async def _gemini(system: str, prompt: str) -> str:
     body = {
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 600},
+        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2048},
     }
     last = "sem resposta"
     async with httpx.AsyncClient(timeout=40) as client:
