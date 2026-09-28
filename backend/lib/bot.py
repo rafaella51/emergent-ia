@@ -1,4 +1,4 @@
-"""Motor do bot qualificador — Claude Sonnet 4.6 via Emergent LLM key."""
+"""Motor do bot qualificador — Google Gemini (chave própria em GEMINI_API_KEY)."""
 import os
 import re
 from typing import Dict, List, Tuple
@@ -62,39 +62,53 @@ def keyword_handoff(text: str, keywords: List[str]) -> bool:
     return any(k.strip().lower() in low for k in keywords if k.strip())
 
 
-async def generate_reply(
-    session_id: str, playbook: Dict, history: List[Dict], user_text: str
-) -> Tuple[str, Dict[str, str]]:
-    """Retorna (texto_limpo, tags). Cai num fallback seguro se a LLM falhar."""
-    key = os.environ.get("EMERGENT_LLM_KEY", "")
-    if not key:
-        return ("Um instante, já te respondo por aqui.", {"HANDOFF": "sim:sem chave de IA"})
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+async def _gemini(system: str, prompt: str) -> str:
+    """Chamada direta à API do Gemini (Google AI Studio) — sem SDK, só httpx."""
+    import httpx
 
-        transcript = "\n".join(
-            f"{'Lead' if m['role'] == 'lead' else 'Você'}: {m['text']}" for m in history[-14:]
-        )
-        prompt = (
-            f"Histórico da conversa até agora:\n{transcript}\n\n"
-            f"Nova mensagem do lead: {user_text}\n\nResponda como Sofia."
-            if transcript
-            else f"Primeira mensagem do lead: {user_text}\n\nResponda como Sofia."
-        )
-        system = build_system_prompt(playbook)
-        last_exc: Exception | None = None
-        for attempt in range(2):  # uma tentativa + um retry para falhas transitórias
-            try:
-                chat = LlmChat(api_key=key, session_id=session_id, system_message=system).with_model(
-                    "anthropic", "claude-sonnet-4-6"
-                )
-                raw = await chat.send_message(UserMessage(text=prompt))
-                return parse_tags(str(raw))
-            except Exception as exc:  # noqa: BLE001
-                last_exc = exc
-        raise last_exc  # type: ignore[misc]
-    except Exception as exc:  # noqa: BLE001
-        return (
-            "Desculpa, tive um problema técnico aqui. Já estou chamando um humano pra te atender.",
-            {"HANDOFF": f"sim:erro de IA ({type(exc).__name__})"},
-        )
+    key = os.environ.get("GEMINI_API_KEY", "").strip()
+    model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest").strip()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    body = {
+        "systemInstruction": {"parts": [{"text": system}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 600},
+    }
+    async with httpx.AsyncClient(timeout=40) as client:
+        resp = await client.post(url, params={"key": key}, json=body)
+    resp.raise_for_status()
+    data = resp.json()
+    parts = data["candidates"][0]["content"]["parts"]
+    return "".join(p.get("text", "") for p in parts)
+
+
+async def generate_reply(
+    session_id: str, playbook: Dict, history: List[Dict], user_text: str, channel: str = "whatsapp"
+) -> Tuple[str, Dict[str, str]]:
+    """Retorna (texto_limpo, tags). Cai num fallback seguro se a IA falhar."""
+    if not os.environ.get("GEMINI_API_KEY", "").strip():
+        return ("Um instante, já te respondo por aqui.", {"HANDOFF": "sim:sem chave de IA (GEMINI_API_KEY)"})
+    transcript = "\n".join(
+        f"{'Lead' if m['role'] == 'lead' else 'Você'}: {m['text']}" for m in history[-14:]
+    )
+    canal = (
+        "\n\nCANAL: esta conversa é por E-MAIL. Escreva como um e-mail curto e humano "
+        "(saudação com o nome, 2 a 5 linhas, 1 pergunta, assine como Rafaella). Sem emojis em excesso."
+        if channel == "email" else ""
+    )
+    prompt = (
+        f"Histórico da conversa até agora:\n{transcript}\n\nNova mensagem do lead: {user_text}\n\nResponda."
+        if transcript
+        else f"Primeira mensagem do lead: {user_text}\n\nResponda."
+    )
+    system = build_system_prompt(playbook) + canal
+    last_exc: Exception | None = None
+    for _ in range(2):  # uma tentativa + um retry para falhas transitórias
+        try:
+            return parse_tags(await _gemini(system, prompt))
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+    return (
+        "Desculpa, tive um problema técnico aqui. Já estou chamando um humano pra te atender.",
+        {"HANDOFF": f"sim:erro de IA ({type(last_exc).__name__})"},
+    )

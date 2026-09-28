@@ -38,7 +38,7 @@ export default function Leads() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
-              <TableHead>Telefone</TableHead>
+              <TableHead>Contato</TableHead>
               <TableHead>Canal</TableHead>
               <TableHead>Nicho</TableHead>
               <TableHead>Score</TableHead>
@@ -50,7 +50,7 @@ export default function Leads() {
             {leads.map((c) => (
               <TableRow key={c.id} data-testid={`lead-row-${c.id}`}>
                 <TableCell className="font-medium">{c.name}</TableCell>
-                <TableCell className="font-mono text-xs">{c.phone}</TableCell>
+                <TableCell className="font-mono text-xs">{c.email || c.phone}</TableCell>
                 <TableCell className="text-muted-foreground">{c.channel}</TableCell>
                 <TableCell className="text-muted-foreground">{c.niche ?? "—"}</TableCell>
                 <TableCell>{c.score}</TableCell>

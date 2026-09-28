@@ -9,6 +9,7 @@ import Inbox from "@/pages/Inbox";
 import Simulator from "@/pages/Simulator";
 import PromptEditor from "@/pages/PromptEditor";
 import Leads from "@/pages/Leads";
+import EmailOutreach from "@/pages/EmailOutreach";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -43,6 +44,7 @@ export default function App() {
       <Route path="/simulador" element={<Protected><Simulator /></Protected>} />
       <Route path="/playbook" element={<Protected><PromptEditor /></Protected>} />
       <Route path="/leads" element={<Protected><Leads /></Protected>} />
+      <Route path="/email" element={<Protected><EmailOutreach /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -4,7 +4,7 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-Channel = Literal["whatsapp", "instagram"]
+Channel = Literal["whatsapp", "instagram", "email"]
 LeadStatus = Literal["novo", "qualificando", "agendado", "perdido"]
 Role = Literal["lead", "bot", "human"]
 
@@ -28,7 +28,12 @@ class Message(BaseModel):
 class Conversation(BaseModel):
     id: str = Field(default_factory=new_id)
     name: str
-    phone: str
+    phone: str = ""
+    email: Optional[str] = None
+    business: Optional[str] = None
+    email_subject: Optional[str] = None
+    last_email_id: Optional[str] = None
+    followups_sent: int = 0
     channel: Channel = "whatsapp"
     status: LeadStatus = "novo"
     service: Optional[str] = None
@@ -78,6 +83,8 @@ class Playbook(BaseModel):
     price_gmb: str
     handoff_keywords: List[str]
     followup_enabled: bool = True
+    email_subject: Optional[str] = None
+    email_opener: Optional[str] = None
     updated_at: datetime = Field(default_factory=now_utc)
 
 
@@ -87,6 +94,8 @@ class PlaybookUpdate(BaseModel):
     price_gmb: str
     handoff_keywords: List[str]
     followup_enabled: bool = True
+    email_subject: Optional[str] = None
+    email_opener: Optional[str] = None
 
 
 class Metrics(BaseModel):
@@ -112,3 +121,9 @@ class PinLogin(BaseModel):
 
 class AuthState(BaseModel):
     authenticated: bool
+
+
+class EmailOutreach(BaseModel):
+    name: str
+    email: str
+    business: Optional[str] = None

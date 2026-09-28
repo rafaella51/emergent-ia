@@ -1,5 +1,5 @@
 // Espelham os modelos Pydantic em backend/models/schemas.py — manter em sincronia.
-export type Channel = "whatsapp" | "instagram";
+export type Channel = "whatsapp" | "instagram" | "email";
 export type LeadStatus = "novo" | "qualificando" | "agendado" | "perdido";
 export type Role = "lead" | "bot" | "human";
 
@@ -8,6 +8,8 @@ export interface Conversation {
   name: string;
   phone: string;
   channel: Channel;
+  email?: string | null;
+  business?: string | null;
   status: LeadStatus;
   service: string | null;
   niche: string | null;

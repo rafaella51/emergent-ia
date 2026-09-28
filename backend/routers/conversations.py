@@ -65,6 +65,9 @@ async def _playbook() -> dict:
 async def _notify(conversation_id: str, kind: str, text: str) -> None:
     note = Notification(conversation_id=conversation_id, kind=kind, text=text)  # type: ignore[arg-type]
     await db.notifications.insert_one(note.model_dump())
+    from lib import email_client
+
+    await email_client.send_alert(text)
 
 
 async def _insert_message(conversation_id: str, role: str, text: str) -> Message:
@@ -100,30 +103,17 @@ async def get_conversation(conversation_id: str):
     return ConversationDetail(conversation=_conv(doc), messages=[_msg(m) for m in msgs])
 
 
-@router.post("/conversations/{conversation_id}/messages", response_model=ConversationDetail)
-async def post_message(conversation_id: str, payload: MessageCreate):
+async def handle_lead_message(conversation_id: str, text: str) -> Optional[str]:
+    """Registra a mensagem do lead, roda o bot e devolve a resposta (ou None se pausado)."""
     doc = await db.conversations.find_one({"id": conversation_id})
     if not doc:
         raise HTTPException(status_code=404, detail="conversa não encontrada")
-    text = payload.text.strip()
-    if not text:
-        raise HTTPException(status_code=422, detail="mensagem vazia")
-
     conv = _conv(doc)
-    await _insert_message(conversation_id, payload.role, text)
-    update: dict = {"last_message": text, "updated_at": now_utc()}
+    await _insert_message(conversation_id, "lead", text)
+    update: dict = {"last_message": text, "updated_at": now_utc(), "followups_sent": 0}
+    reply: Optional[str] = None
 
-    # Resposta manual do atendente vai de verdade pro WhatsApp do lead (se Twilio configurado).
-    if payload.role == "human" and conv.channel == "whatsapp":
-        from lib import twilio_client
-
-        if twilio_client.is_configured() and conv.phone.strip().startswith("+"):
-            try:
-                await twilio_client.send_whatsapp(conv.phone, text)
-            except Exception:  # noqa: BLE001 — falha de envio não pode derrubar o painel
-                update["handoff_reason"] = "falha ao enviar via WhatsApp (verifique o sandbox/janela 24h)"
-
-    if payload.role == "lead" and not conv.bot_paused:
+    if not conv.bot_paused:
         playbook = await _playbook()
         history_docs = await db.messages.find({"conversation_id": conversation_id}).sort("created_at", 1).to_list(200)
         history = [{"role": h["role"], "text": h["text"]} for h in history_docs][:-1]
@@ -133,7 +123,7 @@ async def post_message(conversation_id: str, payload: MessageCreate):
             reply = "Claro! Já vou chamar alguém do time aqui pra falar contigo. Um instantinho 🙌"
             tags = {"HANDOFF": "sim:pedido explícito do lead"}
         else:
-            reply, tags = await bot.generate_reply(conversation_id, playbook, history, text)
+            reply, tags = await bot.generate_reply(conversation_id, playbook, history, text, conv.channel)
         elapsed = int((now_utc() - started).total_seconds() * 1000)
 
         await _insert_message(conversation_id, "bot", reply)
@@ -158,6 +148,53 @@ async def post_message(conversation_id: str, payload: MessageCreate):
         elif update.get("status") == "qualificando" and conv.status == "novo":
             await _notify(conversation_id, "qualificado", f"{conv.name} entrou em qualificação")
 
+    await db.conversations.update_one({"id": conversation_id}, {"$set": update})
+    return reply
+
+
+async def send_to_lead(conv: Conversation, text: str) -> Optional[str]:
+    """Entrega a mensagem pelo canal real do lead. Devolve o motivo se falhar."""
+    try:
+        if conv.channel == "email" and conv.email:
+            from lib import email_client
+
+            if not email_client.can_send():
+                return "e-mail não configurado"
+            subject = conv.email_subject or "Nossa conversa"
+            subject = subject if subject.lower().startswith("re:") else f"Re: {subject}"
+            msg_id = await email_client.send_email(conv.email, conv.name, subject, text, conv.last_email_id)
+            await db.conversations.update_one({"id": conv.id}, {"$set": {"last_email_id": msg_id}})
+        elif conv.channel == "whatsapp":
+            from lib import twilio_client
+
+            if twilio_client.is_configured() and conv.phone.strip().startswith("+"):
+                await twilio_client.send_whatsapp(conv.phone, text)
+    except Exception as exc:  # noqa: BLE001 — falha de envio não pode derrubar o painel
+        return f"falha ao enviar ({type(exc).__name__}: {str(exc)[:120]})"
+    return None
+
+
+@router.post("/conversations/{conversation_id}/messages", response_model=ConversationDetail)
+async def post_message(conversation_id: str, payload: MessageCreate):
+    doc = await db.conversations.find_one({"id": conversation_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="conversa não encontrada")
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="mensagem vazia")
+    conv = _conv(doc)
+
+    if payload.role == "lead":
+        # Simulação no painel: só roda o bot, não envia nada de verdade.
+        await handle_lead_message(conversation_id, text)
+        return await get_conversation(conversation_id)
+
+    await _insert_message(conversation_id, payload.role, text)
+    update: dict = {"last_message": text, "updated_at": now_utc()}
+    if payload.role == "human":
+        err = await send_to_lead(conv, text)
+        if err:
+            update["handoff_reason"] = err
     await db.conversations.update_one({"id": conversation_id}, {"$set": update})
     return await get_conversation(conversation_id)
 
@@ -206,9 +243,20 @@ async def schedule_call(conversation_id: str, payload: ScheduleCreate):
     return _conv(doc)  # type: ignore[arg-type]
 
 
-@router.post("/followups/run")
-async def run_followups():
-    """Follow-up automático: 24h sem resposta → mensagem 1; 72h → mensagem 2; depois perdido."""
+FOLLOWUP_TEXT = {
+    "whatsapp": [
+        "Oi! Passando só pra saber se ainda faz sentido a gente conversar sobre teu projeto 🙂",
+        "Última mensagem por aqui, prometo 🙂 Se agora não for o momento, um 'agora não' resolve — não vou insistir.",
+    ],
+    "email": [
+        "Oi, {nome}! Só retomando minha pergunta rápida sobre a presença de vocês no Google. Posso te perguntar?\n\nRafaella",
+        "Oi, {nome}! Último contato por aqui, prometo. Se agora não for o momento, um \"agora não\" resolve — não vou insistir.\n\nRafaella",
+    ],
+}
+
+
+async def run_followups_job() -> dict:
+    """24h sem resposta → follow-up 1; +48h → follow-up 2; +72h depois disso → perdido."""
     playbook = await _playbook()
     if not playbook.get("followup_enabled", True):
         return {"sent": 0, "lost": 0, "enabled": False}
@@ -217,22 +265,29 @@ async def run_followups():
     docs = await db.conversations.find({"status": {"$in": ["novo", "qualificando"]}}).to_list(500)
     for d in docs:
         conv = _conv(d)
-        idle = now - _aware(d.get("updated_at"))
         if conv.bot_paused:
             continue
-        if idle > timedelta(hours=72):
-            await db.conversations.update_one(
-                {"id": conv.id}, {"$set": {"status": "perdido", "updated_at": now}}
-            )
+        idle = now - _aware(d.get("updated_at"))
+        n = conv.followups_sent
+        wait = timedelta(hours=24 if n == 0 else 48)
+        if n >= 2 and idle > timedelta(hours=72):
+            await db.conversations.update_one({"id": conv.id}, {"$set": {"status": "perdido", "updated_at": now}})
             lost += 1
-        elif idle > timedelta(hours=24):
-            text = "Oi! Passando só pra saber se ainda faz sentido a gente conversar sobre teu projeto 🙂"
+        elif n < 2 and idle > wait:
+            texts = FOLLOWUP_TEXT["email" if conv.channel == "email" else "whatsapp"]
+            text = texts[n].replace("{nome}", conv.name.split(" ")[0])
             await _insert_message(conv.id, "bot", text)
+            await send_to_lead(conv, text)
             await db.conversations.update_one(
-                {"id": conv.id}, {"$set": {"last_message": text, "updated_at": now}}
+                {"id": conv.id}, {"$set": {"last_message": text, "updated_at": now, "followups_sent": n + 1}}
             )
             sent += 1
     return {"sent": sent, "lost": lost, "enabled": True}
+
+
+@router.post("/followups/run")
+async def run_followups():
+    return await run_followups_job()
 
 
 @router.get("/notifications", response_model=List[Notification])

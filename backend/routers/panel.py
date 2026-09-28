@@ -22,11 +22,13 @@ async def get_playbook():
 
 @router.put("/playbook", response_model=Playbook)
 async def update_playbook(payload: PlaybookUpdate):
-    data = payload.model_dump()
+    data = payload.model_dump(exclude_none=True)
     data["id"] = "playbook"
     data["updated_at"] = now_utc()
     await db.playbook.update_one({"id": "playbook"}, {"$set": data}, upsert=True)
-    return Playbook(**data)
+    doc = await db.playbook.find_one({"id": "playbook"})
+    doc.pop("_id", None)  # type: ignore[union-attr]
+    return Playbook(**doc)  # type: ignore[arg-type]
 
 
 @router.get("/metrics", response_model=Metrics)
