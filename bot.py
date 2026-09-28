@@ -119,7 +119,9 @@ async def generate_reply(
     )
     canal = (
         "\n\nCANAL: esta conversa é por E-MAIL. Escreva como um e-mail curto e humano "
-        "(saudação com o nome, 2 a 5 linhas, 1 pergunta, assine como Rafaella). Sem emojis em excesso."
+        "(saudação com o nome do lead, 3 a 6 linhas, 1 pergunta, termine só com \"Um abraço!\" — "
+        "NÃO escreva seu nome na assinatura nem repita \"Rafaella\"; ela já aparece como remetente). "
+        "Sem emojis."
         if channel == "email" else ""
     )
     prompt = (
