@@ -57,8 +57,7 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
     addr = payload.email.strip().lower()
     if "@" not in addr:
         raise HTTPException(status_code=422, detail="e-mail inválido")
-    if await db.conversations.find_one({"email": addr, "channel": "email"}):
-        raise HTTPException(status_code=409, detail="esse e-mail já está no funil")
+    existing = await db.conversations.find_one({"email": addr, "channel": "email"})
     if not email_client.can_send():
         raise HTTPException(status_code=400, detail="configure o Brevo (BREVO_API_KEY e EMAIL_FROM) antes")
 
@@ -68,12 +67,26 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
     subject = (playbook.get("email_subject") or DEFAULT_SUBJECT).replace("{empresa}", empresa)
     body = (playbook.get("email_opener") or DEFAULT_OPENER).replace("{nome}", first).replace("{empresa}", empresa)
 
+    msg_id = await email_client.send_email(addr, payload.name.strip(), subject, body)
+
+    if existing:
+        # Lead já estava no funil: reaborda e recomeça a conversa (histórico antigo fica guardado).
+        await db.conversations.update_one(
+            {"id": existing["id"]},
+            {"$set": {
+                "name": payload.name.strip(), "business": payload.business, "email_subject": subject,
+                "last_email_id": msg_id, "last_message": body, "status": "novo", "score": 0,
+                "bot_paused": False, "handoff_reason": None, "followups_sent": 0,
+                "updated_at": now_utc(),
+            }},
+        )
+        await _insert_message(existing["id"], "bot", body)
+        return _conv(await db.conversations.find_one({"id": existing["id"]}))  # type: ignore[arg-type]
+
     conv = Conversation(
         name=payload.name.strip(), email=addr, business=payload.business, channel="email",
-        email_subject=subject, last_message=body,
+        email_subject=subject, last_message=body, last_email_id=msg_id,
     )
-    msg_id = await email_client.send_email(addr, conv.name, subject, body)
-    conv.last_email_id = msg_id
     await db.conversations.insert_one(conv.model_dump())
     await _insert_message(conv.id, "bot", body)
     return conv
