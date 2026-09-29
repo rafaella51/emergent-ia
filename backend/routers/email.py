@@ -32,8 +32,8 @@ DEFAULT_OPENER = (
     "passem confiança e recebam mais contatos pelo WhatsApp e pelo telefone.\n\n"
     "Por isso, queria te fazer uma pergunta rápida: hoje, atrair mais clientes pela internet é uma "
     "prioridade para vocês?\n\n"
-    "Se for, posso te mostrar em uma conversa de 15 minutos o que dá pra melhorar logo de cara, sem "
-    "compromisso. E se agora não for o momento, um \"agora não\" resolve — não vou insistir.\n\n"
+    "Se for, posso te mostrar em uma conversa rápida de 15 minutos o que dá pra melhorar logo de "
+    "cara. E se agora não for o momento, um \"agora não\" resolve — não vou insistir.\n\n"
     "Um abraço!"
 )
 DEFAULT_SUBJECT = "{empresa} no Google: uma pergunta rápida"

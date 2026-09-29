@@ -18,7 +18,7 @@ import smtplib
 import uuid
 from email.header import decode_header, make_header
 from email.message import EmailMessage
-from email.utils import make_msgid, parseaddr
+from email.utils import formatdate, make_msgid, parseaddr
 from typing import Dict, List, Optional
 
 import httpx
@@ -60,7 +60,7 @@ async def send_email(to: str, to_name: str, subject: str, text: str,
     if not can_send():
         raise RuntimeError("e-mail não configurado")
     msg_id = make_msgid(idstring=uuid.uuid4().hex[:8], domain=_domain())
-    headers = {"Message-ID": msg_id}
+    headers = {"Message-ID": msg_id, "Date": formatdate(localtime=False, usegmt=True)}
     if in_reply_to:
         headers["In-Reply-To"] = in_reply_to
         headers["References"] = in_reply_to

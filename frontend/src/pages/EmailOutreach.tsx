@@ -21,6 +21,10 @@ interface EmailStatus {
   alerts_to: string;
 }
 
+// Pausa aleatória entre envios: e-mails disparados em rajada caem no spam com muito mais facilidade.
+const pause = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
+const gap = () => 25 + Math.floor(Math.random() * 20); // 25 a 45 segundos
+
 function errMsg(e: unknown): string {
   if (e instanceof ApiError) {
     const d = (e.body as { detail?: unknown } | null)?.detail;
@@ -35,6 +39,7 @@ export default function EmailOutreach() {
   const [email, setEmail] = useState("");
   const [business, setBusiness] = useState("");
   const [bulk, setBulk] = useState("");
+  const [progress, setProgress] = useState<string | null>(null);
 
   const status = useQuery({
     queryKey: ["email-status"],
@@ -82,7 +87,14 @@ export default function EmailOutreach() {
     if (!rows.length) return toast.error("Use uma linha por lead: Nome; e-mail; Empresa");
     let ok = 0;
     const fails: string[] = [];
-    for (const [n, e, b = ""] of rows) {
+    for (const [idx, [n, e, b = ""]] of rows.entries()) {
+      if (idx > 0) {
+        for (let t = gap(); t > 0; t--) {
+          setProgress(`Enviado ${idx} de ${rows.length} — próximo em ${t}s (pausa anti-spam)`);
+          await pause(1);
+        }
+      }
+      setProgress(`Enviando ${idx + 1} de ${rows.length}…`);
       try {
         await send.mutateAsync({ name: n, email: e, business: b });
         ok++;
@@ -90,6 +102,7 @@ export default function EmailOutreach() {
         fails.push(`${e}: ${errMsg(err)}`);
       }
     }
+    setProgress(null);
     toast.success(`${ok} de ${rows.length} abordagens enviadas.`);
     if (fails.length) toast.error(fails.slice(0, 3).join("\n"));
     setBulk("");
@@ -186,7 +199,11 @@ export default function EmailOutreach() {
               onChange={(e) => setBulk(e.target.value)}
               placeholder={"Carla; carla@padariasol.com.br; Padaria Sol\nMarcos; marcos@oficinabr.com; Oficina BR"}
             />
-            <Button onClick={sendBulk} disabled={send.isPending} variant="secondary" className="w-full">
+            {progress && <p className="text-xs font-medium text-primary">{progress}</p>}
+            <p className="text-xs text-muted-foreground">
+              Para não cair no spam, o painel espera 25 a 45 segundos entre um e-mail e outro. Deixe a aba aberta.
+            </p>
+            <Button onClick={sendBulk} disabled={send.isPending || !!progress} variant="secondary" className="w-full">
               <Send className="size-4" /> Enviar para todos
             </Button>
           </CardContent>

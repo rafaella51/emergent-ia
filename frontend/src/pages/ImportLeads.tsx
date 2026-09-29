@@ -42,6 +42,10 @@ const SERVICE_TEXT: Record<string, string> = {
   nenhum: "",
 };
 
+// Pausa aleatória entre envios: e-mails disparados em rajada caem no spam com muito mais facilidade.
+const pause = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
+const gap = () => 25 + Math.floor(Math.random() * 20); // 25 a 45 segundos
+
 function errMsg(e: unknown): string {
   if (e instanceof ApiError) {
     const d = (e.body as { detail?: unknown } | null)?.detail;
@@ -142,6 +146,12 @@ export default function ImportLeads() {
     let ok = 0;
     const fails: string[] = [];
     for (const [i, l] of targets.entries()) {
+      if (i > 0) {
+        for (let t = gap(); t > 0; t--) {
+          setBusy(`Enviado ${i} de ${targets.length} — próximo em ${t}s (pausa anti-spam, deixe a aba aberta)`);
+          await pause(1);
+        }
+      }
       setBusy(`Enviando abordagem ${i + 1} de ${targets.length}…`);
       try {
         await apiPost("/email/outreach", {
