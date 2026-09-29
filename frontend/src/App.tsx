@@ -10,6 +10,7 @@ import Simulator from "@/pages/Simulator";
 import PromptEditor from "@/pages/PromptEditor";
 import Leads from "@/pages/Leads";
 import EmailOutreach from "@/pages/EmailOutreach";
+import ImportLeads from "@/pages/ImportLeads";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -45,6 +46,7 @@ export default function App() {
       <Route path="/playbook" element={<Protected><PromptEditor /></Protected>} />
       <Route path="/leads" element={<Protected><Leads /></Protected>} />
       <Route path="/email" element={<Protected><EmailOutreach /></Protected>} />
+      <Route path="/importar" element={<Protected><ImportLeads /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

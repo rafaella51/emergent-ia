@@ -127,3 +127,10 @@ class EmailOutreach(BaseModel):
     name: str
     email: str
     business: Optional[str] = None
+    service: Optional[str] = None
+    import_id: Optional[str] = None
+
+
+class ImportUpload(BaseModel):
+    filename: str
+    data_base64: str

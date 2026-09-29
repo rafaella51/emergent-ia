@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Bot, Inbox as InboxIcon, LayoutDashboard, LogOut, Mail, MessageSquarePlus, Users } from "lucide-react";
+import { Bell, Bot, Inbox as InboxIcon, FileSpreadsheet, LayoutDashboard, LogOut, Mail, MessageSquarePlus, Users } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 import type { Notification } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ const NAV = [
   { to: "/simulador", label: "Simulador", icon: MessageSquarePlus, testid: "nav-simulador" },
   { to: "/playbook", label: "Playbook do bot", icon: Bot, testid: "nav-playbook" },
   { to: "/leads", label: "Leads", icon: Users, testid: "nav-leads" },
+  { to: "/importar", label: "Importar planilha", icon: FileSpreadsheet, testid: "nav-importar" },
   { to: "/email", label: "Abordar por e-mail", icon: Mail, testid: "nav-email" },
 ];
 

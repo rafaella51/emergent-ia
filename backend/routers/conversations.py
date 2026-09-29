@@ -123,7 +123,14 @@ async def handle_lead_message(conversation_id: str, text: str) -> Optional[str]:
             reply = "Claro! Já vou chamar alguém do time aqui pra falar contigo. Um instantinho 🙌"
             tags = {"HANDOFF": "sim:pedido explícito do lead"}
         else:
-            reply, tags = await bot.generate_reply(conversation_id, playbook, history, text, conv.channel)
+            ctx = "\n".join(x for x in [
+                f"Empresa: {conv.business}" if conv.business else "",
+                f"Nicho: {conv.niche}" if conv.niche else "",
+                f"Serviço recomendado pela análise da planilha: {conv.service}" if conv.service else "",
+            ] if x)
+            reply, tags = await bot.generate_reply(
+                conversation_id, playbook, history, text, conv.channel, ctx
+            )
         elapsed = int((now_utc() - started).total_seconds() * 1000)
 
         await _insert_message(conversation_id, "bot", reply)

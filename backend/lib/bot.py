@@ -65,7 +65,7 @@ def keyword_handoff(text: str, keywords: List[str]) -> bool:
 FALLBACK_MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash"]
 
 
-async def _gemini(system: str, prompt: str) -> str:
+async def _gemini(system: str, prompt: str, json_mode: bool = False) -> str:
     """Chama o Gemini (Google AI Studio) só com httpx.
 
     - A chave vai no cabeçalho (nunca na URL, pra não aparecer nos logs).
@@ -87,6 +87,9 @@ async def _gemini(system: str, prompt: str) -> str:
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2048},
     }
+    if json_mode:
+        body["generationConfig"] = {"temperature": 0.2, "maxOutputTokens": 8192,
+                                    "responseMimeType": "application/json"}
     last = "sem resposta"
     async with httpx.AsyncClient(timeout=40) as client:
         for model in models:
@@ -137,12 +140,13 @@ Como responder, conforme o que o lead escreveu:
 4) Qualquer outra dúvida: responda de forma completa e objetiva num e-mail só.
 
 Formato: e-mail humano e caloroso, em parágrafos curtos, saudação com o primeiro nome do lead,
-termine apenas com "Um abraço!". NÃO assine com nome e NÃO repita "Rafaella" (ela já aparece como
+termine apenas com "Um abraço!". Se o nome do lead for o nome da empresa (não de uma pessoa), cumprimente só com "Olá, tudo bem?". NÃO assine com nome e NÃO repita "Rafaella" (ela já aparece como
 remetente). Sem emojis. A etiqueta de STATUS também aceita "perdido"."""
 
 
 async def generate_reply(
-    session_id: str, playbook: Dict, history: List[Dict], user_text: str, channel: str = "whatsapp"
+    session_id: str, playbook: Dict, history: List[Dict], user_text: str, channel: str = "whatsapp",
+    lead_context: str = "",
 ) -> Tuple[str, Dict[str, str]]:
     """Retorna (texto_limpo, tags). Cai num fallback seguro se a IA falhar."""
     if not os.environ.get("GEMINI_API_KEY", "").strip():
@@ -157,6 +161,8 @@ async def generate_reply(
         else f"Primeira mensagem do lead: {user_text}\n\nResponda."
     )
     system = build_system_prompt(playbook) + canal
+    if lead_context:
+        system += "\n\nO QUE JÁ SABEMOS DESTE LEAD (use, não pergunte de novo):\n" + lead_context
     try:
         return parse_tags(await _gemini(system, prompt))
     except Exception as exc:  # noqa: BLE001

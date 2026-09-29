@@ -62,19 +62,29 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
         raise HTTPException(status_code=400, detail="configure o Brevo (BREVO_API_KEY e EMAIL_FROM) antes")
 
     playbook = await _playbook()
-    first = payload.name.strip().split(" ")[0] or "tudo bem"
+    contact = payload.name.strip()
+    if contact and payload.business and contact.lower() == payload.business.strip().lower():
+        contact = ""  # sem nome de pessoa: não chamar a empresa de "Olá, Padaria"
+    first = contact.split(" ")[0] if contact else ""
+    display = contact or (payload.business or "").strip() or addr
     empresa = (payload.business or "").strip() or "sua empresa"
     subject = (playbook.get("email_subject") or DEFAULT_SUBJECT).replace("{empresa}", empresa)
-    body = (playbook.get("email_opener") or DEFAULT_OPENER).replace("{nome}", first).replace("{empresa}", empresa)
+    body = (playbook.get("email_opener") or DEFAULT_OPENER).replace("{empresa}", empresa)
+    body = body.replace("Olá, {nome}, tudo bem?", "Olá, tudo bem?") if not first else body.replace("{nome}", first)
 
-    msg_id = await email_client.send_email(addr, payload.name.strip(), subject, body)
+    msg_id = await email_client.send_email(addr, display, subject, body)
+    if payload.import_id:
+        await db.imported_leads.update_one(
+            {"id": payload.import_id}, {"$set": {"status": "abordado", "contacted_at": now_utc()}}
+        )
 
     if existing:
         # Lead já estava no funil: reaborda e recomeça a conversa (histórico antigo fica guardado).
         await db.conversations.update_one(
             {"id": existing["id"]},
             {"$set": {
-                "name": payload.name.strip(), "business": payload.business, "email_subject": subject,
+                "name": display, "business": payload.business, "email_subject": subject,
+                "service": payload.service or existing.get("service"),
                 "last_email_id": msg_id, "last_message": body, "status": "novo", "score": 0,
                 "bot_paused": False, "handoff_reason": None, "followups_sent": 0,
                 "updated_at": now_utc(),
@@ -84,8 +94,8 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
         return _conv(await db.conversations.find_one({"id": existing["id"]}))  # type: ignore[arg-type]
 
     conv = Conversation(
-        name=payload.name.strip(), email=addr, business=payload.business, channel="email",
-        email_subject=subject, last_message=body, last_email_id=msg_id,
+        name=display, email=addr, business=payload.business, channel="email",
+        email_subject=subject, last_message=body, last_email_id=msg_id, service=payload.service,
     )
     await db.conversations.insert_one(conv.model_dump())
     await _insert_message(conv.id, "bot", body)
