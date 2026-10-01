@@ -23,6 +23,8 @@ export default function PromptEditor() {
   const [priceGmb, setPriceGmb] = useState("");
   const [keywords, setKeywords] = useState("");
   const [followup, setFollowup] = useState(true);
+  const [waNumber, setWaNumber] = useState("");
+  const [demoLinks, setDemoLinks] = useState("");
 
   useEffect(() => {
     if (data) {
@@ -31,6 +33,8 @@ export default function PromptEditor() {
       setPriceGmb(data.price_gmb);
       setKeywords(data.handoff_keywords.join(", "));
       setFollowup(data.followup_enabled);
+      setWaNumber(data.whatsapp_number ?? "");
+      setDemoLinks(data.demo_links ?? "");
     }
   }, [data]);
 
@@ -42,6 +46,8 @@ export default function PromptEditor() {
         price_gmb: priceGmb,
         handoff_keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean),
         followup_enabled: followup,
+        whatsapp_number: waNumber,
+        demo_links: demoLinks,
       }),
     onSuccess: () => {
       toast.success("Playbook salvo — o bot já usa as novas regras");
@@ -89,6 +95,30 @@ export default function PromptEditor() {
               Palavras-chave de handoff (separadas por vírgula)
             </Label>
             <Input id="keywords" value={keywords} onChange={(e) => setKeywords(e.target.value)} data-testid="playbook-keywords-input" className="mt-1" />
+          </div>
+
+          <div>
+            <Label htmlFor="wa-number" className="sqb-label text-muted-foreground">
+              Seu WhatsApp Business (vai como link no e-mail de abordagem)
+            </Label>
+            <Input id="wa-number" value={waNumber} onChange={(e) => setWaNumber(e.target.value)} placeholder="21 99999-9999" className="mt-1" />
+          </div>
+
+          <div>
+            <Label htmlFor="demo-links" className="sqb-label text-muted-foreground">
+              Sites de demonstração por nicho (um por linha: nichos = link)
+            </Label>
+            <Textarea
+              id="demo-links"
+              rows={5}
+              value={demoLinks}
+              onChange={(e) => setDemoLinks(e.target.value)}
+              placeholder={"barbearia, barber = https://seu-link-da-barbearia\noficina, mecânica, auto = https://seu-link-da-oficina\nsalão, beleza, estética = https://seu-link-do-salao\npadrão = https://seu-portfolio"}
+              className="mt-1 font-mono text-xs"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              A Sofia escolhe o link pelo nicho (ou nome) da empresa. A linha "padrão" vale quando nenhum nicho bater.
+            </p>
           </div>
 
           <label className="flex items-center gap-3 text-sm">

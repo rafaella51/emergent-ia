@@ -85,6 +85,8 @@ class Playbook(BaseModel):
     followup_enabled: bool = True
     email_subject: Optional[str] = None
     email_opener: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    demo_links: Optional[str] = None
     updated_at: datetime = Field(default_factory=now_utc)
 
 
@@ -96,6 +98,8 @@ class PlaybookUpdate(BaseModel):
     followup_enabled: bool = True
     email_subject: Optional[str] = None
     email_opener: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    demo_links: Optional[str] = None
 
 
 class Metrics(BaseModel):
@@ -128,6 +132,7 @@ class EmailOutreach(BaseModel):
     email: str
     business: Optional[str] = None
     service: Optional[str] = None
+    niche: Optional[str] = None
     import_id: Optional[str] = None
 
 

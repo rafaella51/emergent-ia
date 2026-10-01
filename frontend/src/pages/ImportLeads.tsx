@@ -159,6 +159,7 @@ export default function ImportLeads() {
           email: l.email,
           business: l.business,
           service: SERVICE_TEXT[l.service ?? ""] || null,
+          niche: l.niche || null,
           import_id: l.id,
         });
         ok++;

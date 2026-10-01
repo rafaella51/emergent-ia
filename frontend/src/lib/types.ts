@@ -43,6 +43,8 @@ export interface Playbook {
   price_gmb: string;
   handoff_keywords: string[];
   followup_enabled: boolean;
+  whatsapp_number?: string | null;
+  demo_links?: string | null;
   updated_at: string;
 }
 

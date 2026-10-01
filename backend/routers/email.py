@@ -39,6 +39,46 @@ DEFAULT_OPENER = (
 DEFAULT_SUBJECT = "{empresa} no Google: uma pergunta rápida"
 
 
+def _norm(txt: str) -> str:
+    import unicodedata
+
+    txt = unicodedata.normalize("NFKD", str(txt or "")).encode("ascii", "ignore").decode()
+    return txt.lower().strip()
+
+
+def pick_demo_link(table: str, niche: Optional[str], business: Optional[str]) -> str:
+    """Tabela no playbook, uma por linha: 'barbearia, barber = https://...'.
+    Escolhe pelo nicho do lead (ou pelo nome da empresa); linha 'padrão = ...' vale para o resto."""
+    hay = f"{_norm(niche or '')} {_norm(business or '')}"
+    default = ""
+    for line in table.splitlines():
+        if "=" not in line:
+            continue
+        keys, link = line.split("=", 1)
+        link = link.strip()
+        if not link.startswith("http"):
+            continue
+        words = [_norm(k) for k in keys.split(",") if k.strip()]
+        if any(w in ("padrao", "default", "outros") for w in words):
+            default = link
+            continue
+        if any(w and w in hay for w in words):
+            return link
+    return default
+
+
+def whatsapp_link(number: str, empresa: str) -> str:
+    from urllib.parse import quote
+
+    digits = "".join(ch for ch in (number or os.environ.get("WHATSAPP_NUMBER", "")) if ch.isdigit())
+    if len(digits) < 10:
+        return ""
+    if not digits.startswith("55") and len(digits) <= 11:
+        digits = "55" + digits
+    text = f"Olá! Recebi seu e-mail sobre a {empresa} e quero saber mais."
+    return f"https://wa.me/{digits}?text={quote(text)}"
+
+
 @router.get("/status")
 async def email_status(_: str = Depends(require_session)):
     return {
@@ -72,15 +112,18 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
     body = (playbook.get("email_opener") or DEFAULT_OPENER).replace("{empresa}", empresa)
     body = body.replace("Olá, {nome}, tudo bem?", "Olá, tudo bem?") if not first else body.replace("{nome}", first)
 
-    from lib import wa_cloud
-
-    wa = wa_cloud.chat_link(f"Olá! Recebi seu e-mail sobre a {empresa} e quero saber mais.")
-    if wa and wa_cloud.is_configured() and "Um abraço!" in body:
-        body = body.replace(
-            "Um abraço!",
-            f"Se for mais prático pra você, pode me responder pelo WhatsApp:\n{wa}\n\nUm abraço!",
-            1,
+    demo = pick_demo_link(playbook.get("demo_links") or "", payload.niche, payload.business)
+    wa = whatsapp_link(playbook.get("whatsapp_number") or "", empresa)
+    extra = ""
+    if demo:
+        extra += (
+            "Pra você ter uma ideia concreta, preparei um exemplo de como um site no estilo de vocês "
+            f"pode ficar (é só uma demonstração):\n{demo}\n\n"
         )
+    if wa:
+        extra += f"Se for mais prático, pode me chamar direto no WhatsApp:\n{wa}\n\n"
+    if extra and "Um abraço!" in body:
+        body = body.replace("Um abraço!", extra + "Um abraço!", 1)
 
     msg_id = await email_client.send_email(addr, display, subject, body)
     if payload.import_id:
