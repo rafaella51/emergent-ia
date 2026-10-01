@@ -72,6 +72,16 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
     body = (playbook.get("email_opener") or DEFAULT_OPENER).replace("{empresa}", empresa)
     body = body.replace("Olá, {nome}, tudo bem?", "Olá, tudo bem?") if not first else body.replace("{nome}", first)
 
+    from lib import wa_cloud
+
+    wa = wa_cloud.chat_link(f"Olá! Recebi seu e-mail sobre a {empresa} e quero saber mais.")
+    if wa and wa_cloud.is_configured() and "Um abraço!" in body:
+        body = body.replace(
+            "Um abraço!",
+            f"Se for mais prático pra você, pode me responder pelo WhatsApp:\n{wa}\n\nUm abraço!",
+            1,
+        )
+
     msg_id = await email_client.send_email(addr, display, subject, body)
     if payload.import_id:
         await db.imported_leads.update_one(

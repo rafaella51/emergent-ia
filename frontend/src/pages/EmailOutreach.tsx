@@ -46,6 +46,11 @@ export default function EmailOutreach() {
     queryFn: () => apiGet<EmailStatus>("/email/status"),
     retry: false,
   });
+  const wa = useQuery({
+    queryKey: ["wa-status"],
+    queryFn: () => apiGet<{ configured: boolean; number: string }>("/whatsapp/status"),
+    retry: false,
+  });
   const convs = useQuery({
     queryKey: ["conversations", "email"],
     queryFn: () => apiGet<Conversation[]>("/conversations"),
@@ -157,6 +162,9 @@ export default function EmailOutreach() {
         </Badge>
         <Badge className="bg-muted text-muted-foreground">
           Alertas: {s?.alerts_to || "desligados"}
+        </Badge>
+        <Badge className={wa.data?.configured ? "bg-emerald-500/15 text-emerald-600" : "bg-muted text-muted-foreground"}>
+          WhatsApp oficial: {wa.data?.configured ? `ok · +${wa.data.number}` : "não configurado"}
         </Badge>
       </div>
 

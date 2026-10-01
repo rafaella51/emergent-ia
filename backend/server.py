@@ -66,6 +66,7 @@ from routers.panel import router as panel_router  # noqa: E402
 from routers.twilio import router as twilio_router  # noqa: E402
 from routers.email import router as email_router  # noqa: E402
 from routers.imports import router as imports_router  # noqa: E402
+from routers.whatsapp import router as whatsapp_router  # noqa: E402
 
 api_router.include_router(auth_router)
 api_router.include_router(conversations_router)
@@ -73,6 +74,7 @@ api_router.include_router(panel_router)
 api_router.include_router(twilio_router)
 api_router.include_router(email_router)
 api_router.include_router(imports_router)
+api_router.include_router(whatsapp_router)
 
 # Include the router in the main app
 app.include_router(api_router)

@@ -172,9 +172,11 @@ async def send_to_lead(conv: Conversation, text: str) -> Optional[str]:
             msg_id = await email_client.send_email(conv.email, conv.name, subject, text, conv.last_email_id)
             await db.conversations.update_one({"id": conv.id}, {"$set": {"last_email_id": msg_id}})
         elif conv.channel == "whatsapp":
-            from lib import twilio_client
+            from lib import twilio_client, wa_cloud
 
-            if twilio_client.is_configured() and conv.phone.strip().startswith("+"):
+            if wa_cloud.is_configured() and conv.phone.strip():
+                await wa_cloud.send_text(conv.phone, text)
+            elif twilio_client.is_configured() and conv.phone.strip().startswith("+"):
                 await twilio_client.send_whatsapp(conv.phone, text)
     except Exception as exc:  # noqa: BLE001 — falha de envio não pode derrubar o painel
         return f"falha ao enviar ({type(exc).__name__}: {str(exc)[:120]})"
@@ -263,7 +265,8 @@ FOLLOWUP_TEXT = {
 
 
 async def run_followups_job() -> dict:
-    """24h sem resposta → follow-up 1; +48h → follow-up 2; +72h depois disso → perdido."""
+    """Ritmo respeitoso pra não irritar o lead (e não ser bloqueado):
+    3 dias sem resposta → follow-up 1; +4 dias → follow-up 2 (último); +7 dias → perdido."""
     playbook = await _playbook()
     if not playbook.get("followup_enabled", True):
         return {"sent": 0, "lost": 0, "enabled": False}
@@ -276,8 +279,8 @@ async def run_followups_job() -> dict:
             continue
         idle = now - _aware(d.get("updated_at"))
         n = conv.followups_sent
-        wait = timedelta(hours=24 if n == 0 else 48)
-        if n >= 2 and idle > timedelta(hours=72):
+        wait = timedelta(days=3 if n == 0 else 4)
+        if n >= 2 and idle > timedelta(days=7):
             await db.conversations.update_one({"id": conv.id}, {"$set": {"status": "perdido", "updated_at": now}})
             lost += 1
         elif n < 2 and idle > wait:

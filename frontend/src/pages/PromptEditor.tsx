@@ -93,7 +93,7 @@ export default function PromptEditor() {
 
           <label className="flex items-center gap-3 text-sm">
             <Checkbox checked={followup} onCheckedChange={(v) => setFollowup(Boolean(v))} data-testid="playbook-followup-checkbox" />
-            Follow-up automático de leads inativos (24h e 72h)
+            Follow-up automático de leads inativos (após 3 dias e 7 dias)
           </label>
 
           <Button onClick={() => save.mutate()} disabled={save.isPending} data-testid="playbook-save-button" className="self-start">

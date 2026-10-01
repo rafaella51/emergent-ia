@@ -61,7 +61,7 @@ export default function Dashboard() {
           onClick={() => followups.mutate()}
           disabled={followups.isPending}
         >
-          {followups.isPending ? "Rodando…" : "Rodar follow-ups (24h / 72h)"}
+          {followups.isPending ? "Rodando…" : "Rodar follow-ups (3 e 7 dias)"}
         </Button>
       </div>
 
