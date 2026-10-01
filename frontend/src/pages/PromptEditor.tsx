@@ -113,11 +113,13 @@ export default function PromptEditor() {
               rows={5}
               value={demoLinks}
               onChange={(e) => setDemoLinks(e.target.value)}
-              placeholder={"barbearia, barber = https://seu-link-da-barbearia\noficina, mecânica, auto = https://seu-link-da-oficina\nsalão, beleza, estética = https://seu-link-do-salao\npadrão = https://seu-portfolio"}
+              placeholder={"barbearia, barber = https://seu-link-da-barbearia | app\ndentista, odonto = https://seu-link-do-dentista | app\ncontabilidade, contador = https://seu-link-da-contabilidade\npadrão = https://seu-portfolio"}
               className="mt-1 font-mono text-xs"
             />
             <p className="mt-1 text-xs text-muted-foreground">
               A Sofia escolhe o link pelo nicho (ou nome) da empresa. A linha "padrão" vale quando nenhum nicho bater.
+              Termine a linha com <b>| app</b> quando o link for o app de agendamento/pedidos — aí a Sofia apresenta
+              como "sistema de agendamento online" em vez de "exemplo de site".
             </p>
           </div>
 

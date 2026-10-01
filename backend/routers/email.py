@@ -46,24 +46,27 @@ def _norm(txt: str) -> str:
     return txt.lower().strip()
 
 
-def pick_demo_link(table: str, niche: Optional[str], business: Optional[str]) -> str:
-    """Tabela no playbook, uma por linha: 'barbearia, barber = https://...'.
+def pick_demo_link(table: str, niche: Optional[str], business: Optional[str]) -> tuple:
+    """Tabela no playbook, uma por linha: 'barbearia, barber = https://... | app'.
+    Devolve (link, tipo) — tipo 'app' quando a linha termina com '| app', senão 'site'.
     Escolhe pelo nicho do lead (ou pelo nome da empresa); linha 'padrão = ...' vale para o resto."""
     hay = f"{_norm(niche or '')} {_norm(business or '')}"
-    default = ""
+    default = ("", "site")
     for line in table.splitlines():
         if "=" not in line:
             continue
-        keys, link = line.split("=", 1)
-        link = link.strip()
+        keys, rest = line.split("=", 1)
+        parts = [p.strip() for p in rest.split("|")]
+        link = parts[0]
+        kind = "app" if any(_norm(p) in ("app", "aplicativo", "agendamento", "pedidos") for p in parts[1:]) else "site"
         if not link.startswith("http"):
             continue
         words = [_norm(k) for k in keys.split(",") if k.strip()]
         if any(w in ("padrao", "default", "outros") for w in words):
-            default = link
+            default = (link, kind)
             continue
         if any(w and w in hay for w in words):
-            return link
+            return (link, kind)
     return default
 
 
@@ -112,10 +115,16 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
     body = (playbook.get("email_opener") or DEFAULT_OPENER).replace("{empresa}", empresa)
     body = body.replace("Olá, {nome}, tudo bem?", "Olá, tudo bem?") if not first else body.replace("{nome}", first)
 
-    demo = pick_demo_link(playbook.get("demo_links") or "", payload.niche, payload.business)
+    demo, demo_kind = pick_demo_link(playbook.get("demo_links") or "", payload.niche, payload.business)
     wa = whatsapp_link(playbook.get("whatsapp_number") or "", empresa)
     extra = ""
-    if demo:
+    if demo and demo_kind == "app":
+        extra += (
+            "Pra você ter uma ideia concreta, preparei a demonstração de um sistema de agendamento online: "
+            "o cliente escolhe o serviço, o dia e o horário, e o pedido chega organizado direto no WhatsApp "
+            f"de vocês. Pode testar à vontade, é só uma demonstração:\n{demo}\n\n"
+        )
+    elif demo:
         extra += (
             "Pra você ter uma ideia concreta, preparei um exemplo de como um site no estilo de vocês "
             f"pode ficar (é só uma demonstração):\n{demo}\n\n"
