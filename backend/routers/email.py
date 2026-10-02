@@ -1,5 +1,6 @@
 """Canal de e-mail: abordagem, leitura de respostas e rotina automática (cron)."""
 import os
+import re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -46,28 +47,36 @@ def _norm(txt: str) -> str:
     return txt.lower().strip()
 
 
+def _stems(txt: str) -> set:
+    """Palavras com 4+ letras, cortadas em 5 letras: 'barbeiro' e 'barbearia' viram 'barbe'."""
+    return {w[:5] for w in re.findall(r"[a-z]{4,}", _norm(txt))}
+
+
 def pick_demo_link(table: str, niche: Optional[str], business: Optional[str]) -> tuple:
-    """Tabela no playbook, uma por linha: 'barbearia, barber = https://... | app'.
-    Devolve (link, tipo) — tipo 'app' quando a linha termina com '| app', senão 'site'.
+    """Tabela no playbook, uma por linha, ex.: 'barbearia, barber = https://... | app'.
+    Aceita '=', ':' ou '-' antes do link. Devolve (link, tipo): 'app' quando a linha tem '| app'.
     Escolhe pelo nicho do lead (ou pelo nome da empresa); linha 'padrão = ...' vale para o resto."""
     hay = f"{_norm(niche or '')} {_norm(business or '')}"
+    hay_stems = _stems(hay)
     default = ("", "site")
+    stem_hit = None
     for line in table.splitlines():
-        if "=" not in line:
+        m = re.search(r"https?://[^\s|]+", line)
+        if not m:
             continue
-        keys, rest = line.split("=", 1)
-        parts = [p.strip() for p in rest.split("|")]
-        link = parts[0]
-        kind = "app" if any(_norm(p) in ("app", "aplicativo", "agendamento", "pedidos") for p in parts[1:]) else "site"
-        if not link.startswith("http"):
-            continue
-        words = [_norm(k) for k in keys.split(",") if k.strip()]
-        if any(w in ("padrao", "default", "outros") for w in words):
+        link = m.group(0).rstrip(".,;")
+        keys = line[: m.start()].strip().rstrip("=:-–— ").strip()
+        after = _norm(line[m.end():])
+        kind = "app" if re.search(r"\b(app|aplicativo|agendamento|pedidos?)\b", after) else "site"
+        words = [_norm(k) for k in re.split(r"[,/;]| e ", keys) if k.strip()]
+        if any(w in ("padrao", "default", "outros", "geral") for w in words):
             default = (link, kind)
             continue
         if any(w and w in hay for w in words):
             return (link, kind)
-    return default
+        if stem_hit is None and hay_stems & _stems(" ".join(words)):
+            stem_hit = (link, kind)
+    return stem_hit or default
 
 
 def whatsapp_link(number: str, empresa: str) -> str:
@@ -131,8 +140,11 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
         )
     if wa:
         extra += f"Se for mais prático, pode me chamar direto no WhatsApp:\n{wa}\n\n"
-    if extra and "Um abraço!" in body:
-        body = body.replace("Um abraço!", extra + "Um abraço!", 1)
+    if extra:
+        if "Um abraço!" in body:
+            body = body.replace("Um abraço!", extra + "Um abraço!", 1)
+        else:
+            body = body.rstrip() + "\n\n" + extra.rstrip()
 
     msg_id = await email_client.send_email(addr, display, subject, body)
     if payload.import_id:

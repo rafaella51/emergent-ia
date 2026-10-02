@@ -38,6 +38,7 @@ export default function EmailOutreach() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [business, setBusiness] = useState("");
+  const [niche, setNiche] = useState("");
   const [bulk, setBulk] = useState("");
   const [progress, setProgress] = useState<string | null>(null);
 
@@ -66,18 +67,19 @@ export default function EmailOutreach() {
   };
 
   const send = useMutation({
-    mutationFn: (p: { name: string; email: string; business: string }) =>
+    mutationFn: (p: { name: string; email: string; business: string; niche?: string }) =>
       apiPost<Conversation>("/email/outreach", p),
   });
 
   const sendOne = async () => {
     if (!name.trim() || !email.trim()) return toast.error("Preencha nome e e-mail.");
     try {
-      await send.mutateAsync({ name, email, business });
+      await send.mutateAsync({ name, email, business, niche: niche || undefined });
       toast.success(`Abordagem enviada para ${name}.`);
       setName("");
       setEmail("");
       setBusiness("");
+      setNiche("");
       refresh();
     } catch (e) {
       toast.error(errMsg(e));
@@ -89,10 +91,10 @@ export default function EmailOutreach() {
       .split("\n")
       .map((l) => l.split(/[;\t]/).map((x) => x.trim()))
       .filter((r) => r.length >= 2 && r[1].includes("@"));
-    if (!rows.length) return toast.error("Use uma linha por lead: Nome; e-mail; Empresa");
+    if (!rows.length) return toast.error("Use uma linha por lead: Nome; e-mail; Empresa; Nicho");
     let ok = 0;
     const fails: string[] = [];
-    for (const [idx, [n, e, b = ""]] of rows.entries()) {
+    for (const [idx, [n, e, b = "", ni = ""]] of rows.entries()) {
       if (idx > 0) {
         for (let t = gap(); t > 0; t--) {
           setProgress(`Enviado ${idx} de ${rows.length} — próximo em ${t}s (pausa anti-spam)`);
@@ -101,7 +103,7 @@ export default function EmailOutreach() {
       }
       setProgress(`Enviando ${idx + 1} de ${rows.length}…`);
       try {
-        await send.mutateAsync({ name: n, email: e, business: b });
+        await send.mutateAsync({ name: n, email: e, business: b, niche: ni || undefined });
         ok++;
       } catch (err) {
         fails.push(`${e}: ${errMsg(err)}`);
@@ -188,6 +190,10 @@ export default function EmailOutreach() {
               <Label htmlFor="em-biz">Empresa</Label>
               <Input id="em-biz" value={business} onChange={(e) => setBusiness(e.target.value)} placeholder="Padaria Sol" />
             </div>
+            <div>
+              <Label htmlFor="em-niche">Nicho (escolhe o site de demonstração)</Label>
+              <Input id="em-niche" value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="barbearia, salão, dentista…" />
+            </div>
             <Button onClick={sendOne} disabled={send.isPending} className="w-full">
               <Send className="size-4" /> Enviar abordagem
             </Button>
@@ -199,13 +205,13 @@ export default function EmailOutreach() {
             <CardTitle className="text-base">Vários de uma vez</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Label htmlFor="em-bulk">Uma linha por lead: Nome; e-mail; Empresa</Label>
+            <Label htmlFor="em-bulk">Uma linha por lead: Nome; e-mail; Empresa; Nicho</Label>
             <Textarea
               id="em-bulk"
               rows={7}
               value={bulk}
               onChange={(e) => setBulk(e.target.value)}
-              placeholder={"Carla; carla@padariasol.com.br; Padaria Sol\nMarcos; marcos@oficinabr.com; Oficina BR"}
+              placeholder={"Carla; carla@studiocarla.com.br; Studio Carla; salão\nMarcos; marcos@barbearia.com; Barbearia BR; barbearia"}
             />
             {progress && <p className="text-xs font-medium text-primary">{progress}</p>}
             <p className="text-xs text-muted-foreground">
