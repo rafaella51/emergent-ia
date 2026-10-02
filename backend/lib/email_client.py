@@ -15,6 +15,7 @@ import imaplib
 import os
 import re
 import smtplib
+import html
 import uuid
 from email.header import decode_header, make_header
 from email.message import EmailMessage
@@ -54,6 +55,44 @@ def _domain() -> str:
     return (from_email().split("@")[-1] or "bot.local")
 
 
+_URL_RE = re.compile(r"https?://\S+")
+
+
+def _button(url: str, label: str, color: str) -> str:
+    return (
+        f'<p style="margin:18px 0"><a href="{html.escape(url, quote=True)}" target="_blank" '
+        f'style="display:inline-block;background:{color};color:#ffffff;text-decoration:none;'
+        f'font-weight:bold;padding:12px 22px;border-radius:8px;font-family:Arial,sans-serif;'
+        f'font-size:15px">{label}</a></p>'
+    )
+
+
+def text_to_html(text: str) -> str:
+    """Versão HTML do e-mail: links compridos viram botões (WhatsApp verde, demonstração azul)."""
+    parts = []
+    for block in re.split(r"\n\s*\n", text.strip()):
+        lines = block.split("\n")
+        para, buttons = [], []
+        for line in lines:
+            url = line.strip()
+            if _URL_RE.fullmatch(url):
+                if "wa.me/" in url or "whatsapp.com" in url:
+                    buttons.append(_button(url, "Chamar no WhatsApp", "#25D366"))
+                else:
+                    buttons.append(_button(url, "Ver a demonstração", "#2563EB"))
+                continue
+            esc = html.escape(line)
+            esc = _URL_RE.sub(lambda m: f'<a href="{m.group(0)}">{m.group(0)}</a>', esc)
+            para.append(esc)
+        if para:
+            parts.append('<p style="margin:0 0 14px">' + "<br>".join(para) + "</p>")
+        parts.extend(buttons)
+    return (
+        '<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.55;color:#222">'
+        + "".join(parts) + "</div>"
+    )
+
+
 async def send_email(to: str, to_name: str, subject: str, text: str,
                      in_reply_to: Optional[str] = None) -> str:
     """Envia e devolve o Message-ID (pra manter tudo na mesma conversa/thread)."""
@@ -75,6 +114,8 @@ async def send_email(to: str, to_name: str, subject: str, text: str,
             for k, v in headers.items():
                 m[k] = v
             m.set_content(text)
+            if _URL_RE.search(text):
+                m.add_alternative(text_to_html(text), subtype="html")
             with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as s:
                 s.login(_env("GMAIL_USER"), _env("GMAIL_APP_PASSWORD"))
                 s.send_message(m)
@@ -87,6 +128,7 @@ async def send_email(to: str, to_name: str, subject: str, text: str,
         "replyTo": {"email": reply_to(), "name": sender_name},
         "subject": subject,
         "textContent": text,
+        **({"htmlContent": text_to_html(text)} if _URL_RE.search(text) else {}),
         "headers": headers,
     }
     async with httpx.AsyncClient(timeout=30) as client:
