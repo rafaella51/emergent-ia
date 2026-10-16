@@ -127,6 +127,13 @@ async def handle_lead_message(conversation_id: str, text: str) -> Optional[str]:
                 f"Empresa: {conv.business}" if conv.business else "",
                 f"Nicho: {conv.niche}" if conv.niche else "",
                 f"Serviço recomendado pela análise da planilha: {conv.service}" if conv.service else "",
+                (
+                    "No 1º e-mail oferecemos uma demonstração ("
+                    + ("sistema de agendamento online" if conv.demo_kind == "app" else "exemplo de site")
+                    + f"). Link: {conv.demo_link}\nSe o lead pedir, aceitar ou demonstrar interesse em ver, "
+                    "envie o link SOZINHO numa linha própria (ele vira um botão), com 1 frase curta antes. "
+                    "Não mande o link de novo se já mandou nesta conversa."
+                ) if conv.demo_link else "",
             ] if x)
             reply, tags = await bot.generate_reply(
                 conversation_id, playbook, history, text, conv.channel, ctx

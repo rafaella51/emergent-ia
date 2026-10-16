@@ -102,10 +102,10 @@ OPENER_SYSTEM = """Você é a Sofia e escreve o PRIMEIRO e-mail de prospecção 
 Escolha UM modelo abaixo, o que mais combina com os dados da empresa, e adapte com os dados reais dela.
 
 MODELO A — Agendamento (barbearia, salão, estética, dentista, clínica, personal, pet shop etc.; ou quando o tipo de demonstração for "app"):
-abre com uma dúvida ("Uma dúvida: hoje a {empresa} marca os horários pelo WhatsApp, um por um?"), explica em 1-2 frases o sistema (cliente escolhe serviço, profissional, dia e horário em poucos cliques; pedido chega organizado no WhatsApp; atendimento a qualquer hora, sem ninguém parado respondendo), cita a demonstração que vai logo abaixo e propõe 10 minutos de conversa ("Pode ser amanhã às 14h?").
+abre com uma dúvida ("Uma dúvida: hoje a {empresa} marca os horários pelo WhatsApp, um por um?"), explica em 1-2 frases o sistema (cliente escolhe serviço, profissional, dia e horário em poucos cliques; pedido chega organizado no WhatsApp; atendimento a qualquer hora, sem ninguém parado respondendo), oferece a demonstração (se houver) e propõe 10 minutos de conversa ("Pode ser amanhã às 14h?").
 
 MODELO B — Site (empresa SEM site próprio, ou só com Instagram/link genérico):
-abre com "Uma dúvida: a {empresa} tem site próprio hoje?", explica que quem pesquisa no Google e não encontra site acaba indo no próximo da lista, diz o que entrega (site rápido, com botão direto pro WhatsApp){prazo}, cita o exemplo que vai logo abaixo e propõe 10 minutos de conversa.
+abre com "Uma dúvida: a {empresa} tem site próprio hoje?", explica que quem pesquisa no Google e não encontra site acaba indo no próximo da lista, diz o que entrega (site rápido, com botão direto pro WhatsApp){prazo}, oferece o exemplo (se houver) e propõe 10 minutos de conversa.
 
 MODELO C — Google Meu Negócio (empresa que JÁ tem site, ou com nota/avaliações fracas):
 abre com "Não sei se é com você que trato esse assunto, mas queria te fazer uma pergunta rápida sobre a {empresa}.", cita o dado concreto do perfil que estiver nos dados (nota, número de avaliações) e explica que é por esse perfil que o cliente decide pra quem ligar; diz que o trabalho dela é deixar o perfil completo e bem posicionado nas buscas da região; oferece um diagnóstico rápido e gratuito ("Toparia ver?").
@@ -120,7 +120,8 @@ REGRAS (obrigatórias):
 - Comece com "Olá, {saudacao}tudo bem?" e diga "Sou a Rafaella" UMA única vez. Termine EXATAMENTE com a linha "Um abraço!" (sem nome, sem assinatura).
 - NUNCA invente: clientes atendidos, resultados, números, prazos, preços ou dados que não estejam abaixo. Se não houver nota/avaliações nos dados, não cite números.
 - NUNCA cite concorrentes pelo nome nem diga que concorrentes aparecem na frente.
-- NÃO escreva links, URLs, colchetes ou placeholders: a demonstração e o botão do WhatsApp são inseridos automaticamente logo antes de "Um abraço!". Pode dizer "deixei uma demonstração logo abaixo" SOMENTE se houver demonstração.
+- NÃO escreva links, URLs, colchetes ou placeholders. O botão do WhatsApp é inserido automaticamente antes de "Um abraço!".
+- A demonstração NÃO vai neste e-mail (links demais derrubam o e-mail no spam). Se tipo_de_demonstracao não for "nenhuma", OFEREÇA mandar: ex. "Preparei uma demonstração de como ficaria pra vocês — quer que eu te mande?" (para "app", fale em sistema de agendamento; para "site", em exemplo de site). Se for "nenhuma", não fale de demonstração.
 - Sem CAIXA ALTA, sem emojis, sem exclamações em excesso, sem promessas exageradas.
 - Assunto: 2 a 5 palavras, minúsculas (exceto o nome da empresa), sem pontuação de impacto. Ex.: "ideia pro site da {empresa}", "{empresa} no Google".
 Responda SOMENTE com JSON: {"modelo": "A|B|C|D|E", "assunto": "...", "corpo": "..."}"""
@@ -209,18 +210,14 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
             ai_used = True
     wa = whatsapp_link(playbook.get("whatsapp_number") or "", empresa)
     extra = ""
-    if demo and ai_used:
-        extra += f"{demo}\n\n"  # o texto da Sofia já apresenta a demonstração; aqui vira só o botão
-    elif demo and demo_kind == "app":
+    # A demonstração não vai no 1º e-mail (menos links = menos spam): a Sofia oferece e manda se o lead pedir.
+    if demo and not ai_used:
         extra += (
-            "Pra você ter uma ideia concreta, preparei a demonstração de um sistema de agendamento online: "
-            "o cliente escolhe o serviço, o dia e o horário, e o pedido chega organizado direto no WhatsApp "
-            f"de vocês. Pode testar à vontade, é só uma demonstração:\n{demo}\n\n"
-        )
-    elif demo:
-        extra += (
-            "Pra você ter uma ideia concreta, preparei um exemplo de como um site no estilo de vocês "
-            f"pode ficar (é só uma demonstração):\n{demo}\n\n"
+            "Pra você ter uma ideia concreta, preparei "
+            + ("a demonstração de um sistema de agendamento online, em que o cliente escolhe o serviço, o dia e o horário "
+               "e o pedido chega organizado no WhatsApp de vocês." if demo_kind == "app"
+               else "um exemplo de como um site no estilo de vocês pode ficar.")
+            + " Quer que eu te mande?\n\n"
         )
     if wa:
         extra += f"Se for mais prático, pode me chamar direto no WhatsApp:\n{wa}\n\n"
@@ -243,6 +240,8 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
             {"$set": {
                 "name": display, "business": payload.business, "email_subject": subject,
                 "service": payload.service or existing.get("service"),
+                "niche": payload.niche or existing.get("niche"),
+                "demo_link": demo or None, "demo_kind": demo_kind if demo else None,
                 "last_email_id": msg_id, "last_message": body, "status": "novo", "score": 0,
                 "bot_paused": False, "handoff_reason": None, "followups_sent": 0,
                 "updated_at": now_utc(),
@@ -254,6 +253,7 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
     conv = Conversation(
         name=display, email=addr, business=payload.business, channel="email",
         email_subject=subject, last_message=body, last_email_id=msg_id, service=payload.service,
+        niche=payload.niche, demo_link=demo or None, demo_kind=demo_kind if demo else None,
     )
     await db.conversations.insert_one(conv.model_dump())
     await _insert_message(conv.id, "bot", body)

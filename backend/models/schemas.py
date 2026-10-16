@@ -38,6 +38,8 @@ class Conversation(BaseModel):
     status: LeadStatus = "novo"
     service: Optional[str] = None
     niche: Optional[str] = None
+    demo_link: Optional[str] = None
+    demo_kind: Optional[str] = None
     score: int = 0
     bot_paused: bool = False
     handoff_reason: Optional[str] = None
