@@ -25,6 +25,8 @@ export default function PromptEditor() {
   const [followup, setFollowup] = useState(true);
   const [waNumber, setWaNumber] = useState("");
   const [demoLinks, setDemoLinks] = useState("");
+  const [emailAi, setEmailAi] = useState(true);
+  const [deliveryTime, setDeliveryTime] = useState("");
 
   useEffect(() => {
     if (data) {
@@ -35,6 +37,8 @@ export default function PromptEditor() {
       setFollowup(data.followup_enabled);
       setWaNumber(data.whatsapp_number ?? "");
       setDemoLinks(data.demo_links ?? "");
+      setEmailAi(data.email_ai ?? true);
+      setDeliveryTime(data.delivery_time ?? "");
     }
   }, [data]);
 
@@ -48,6 +52,8 @@ export default function PromptEditor() {
         followup_enabled: followup,
         whatsapp_number: waNumber,
         demo_links: demoLinks,
+        email_ai: emailAi,
+        delivery_time: deliveryTime,
       }),
     onSuccess: () => {
       toast.success("Playbook salvo — o bot já usa as novas regras");
@@ -122,6 +128,21 @@ export default function PromptEditor() {
               como "sistema de agendamento online" em vez de "exemplo de site".
             </p>
           </div>
+
+          <div>
+            <Label htmlFor="delivery-time" className="sqb-label text-muted-foreground">
+              Prazo de entrega do site (opcional — só preencha se conseguir cumprir)
+            </Label>
+            <Input id="delivery-time" value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} placeholder="em até 24 horas" className="mt-1" />
+          </div>
+
+          <label className="flex items-start gap-3 text-sm">
+            <Checkbox checked={emailAi} onCheckedChange={(v) => setEmailAi(Boolean(v))} className="mt-0.5" />
+            <span>
+              Sofia escreve cada abordagem: analisa a empresa e escolhe o melhor modelo (agendamento, site, Google
+              Meu Negócio ou posts). Desligado, usa sempre o texto fixo.
+            </span>
+          </label>
 
           <label className="flex items-center gap-3 text-sm">
             <Checkbox checked={followup} onCheckedChange={(v) => setFollowup(Boolean(v))} data-testid="playbook-followup-checkbox" />

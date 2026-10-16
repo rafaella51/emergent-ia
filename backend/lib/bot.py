@@ -65,7 +65,7 @@ def keyword_handoff(text: str, keywords: List[str]) -> bool:
 FALLBACK_MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash"]
 
 
-async def _gemini(system: str, prompt: str, json_mode: bool = False) -> str:
+async def _gemini(system: str, prompt: str, json_mode: bool = False, temperature: float = 0.2) -> str:
     """Chama o Gemini (Google AI Studio) só com httpx.
 
     - A chave vai no cabeçalho (nunca na URL, pra não aparecer nos logs).
@@ -88,7 +88,7 @@ async def _gemini(system: str, prompt: str, json_mode: bool = False) -> str:
         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2048},
     }
     if json_mode:
-        body["generationConfig"] = {"temperature": 0.2, "maxOutputTokens": 8192,
+        body["generationConfig"] = {"temperature": temperature, "maxOutputTokens": 8192,
                                     "responseMimeType": "application/json"}
     last = "sem resposta"
     async with httpx.AsyncClient(timeout=40) as client:

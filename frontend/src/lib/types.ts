@@ -45,6 +45,8 @@ export interface Playbook {
   followup_enabled: boolean;
   whatsapp_number?: string | null;
   demo_links?: string | null;
+  email_ai?: boolean;
+  delivery_time?: string | null;
   updated_at: string;
 }
 

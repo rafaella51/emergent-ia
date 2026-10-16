@@ -87,6 +87,8 @@ class Playbook(BaseModel):
     email_opener: Optional[str] = None
     whatsapp_number: Optional[str] = None
     demo_links: Optional[str] = None
+    email_ai: bool = True
+    delivery_time: Optional[str] = None
     updated_at: datetime = Field(default_factory=now_utc)
 
 
@@ -100,6 +102,8 @@ class PlaybookUpdate(BaseModel):
     email_opener: Optional[str] = None
     whatsapp_number: Optional[str] = None
     demo_links: Optional[str] = None
+    email_ai: Optional[bool] = None
+    delivery_time: Optional[str] = None
 
 
 class Metrics(BaseModel):

@@ -1,11 +1,13 @@
 """Canal de e-mail: abordagem, leitura de respostas e rotina automática (cron)."""
+import json
+import logging
 import os
 import re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
-from lib import email_client
+from lib import bot, email_client
 from lib.db import db
 from models.schemas import Conversation, EmailOutreach, now_utc
 from routers.auth import require_session
@@ -91,6 +93,68 @@ def whatsapp_link(number: str, empresa: str) -> str:
     return f"https://wa.me/{digits}?text={quote(text)}"
 
 
+OPENER_SYSTEM = """Você é a Sofia e escreve o PRIMEIRO e-mail de prospecção da Rafaella, freelancer que oferece:
+- criação de sites e landing pages (feitos com apoio de IA, entrega rápida);
+- sistema/app de agendamento online (o cliente escolhe serviço, profissional, dia e horário e o pedido chega no WhatsApp);
+- otimização do perfil no Google Meu Negócio (fotos, avaliações, informações, aparecer nas buscas da região);
+- design de posts para Instagram.
+
+Escolha UM modelo abaixo, o que mais combina com os dados da empresa, e adapte com os dados reais dela.
+
+MODELO A — Agendamento (barbearia, salão, estética, dentista, clínica, personal, pet shop etc.; ou quando o tipo de demonstração for "app"):
+abre com uma dúvida ("Uma dúvida: hoje a {empresa} marca os horários pelo WhatsApp, um por um?"), explica em 1-2 frases o sistema (cliente escolhe serviço, profissional, dia e horário em poucos cliques; pedido chega organizado no WhatsApp; atendimento a qualquer hora, sem ninguém parado respondendo), cita a demonstração que vai logo abaixo e propõe 10 minutos de conversa ("Pode ser amanhã às 14h?").
+
+MODELO B — Site (empresa SEM site próprio, ou só com Instagram/link genérico):
+abre com "Uma dúvida: a {empresa} tem site próprio hoje?", explica que quem pesquisa no Google e não encontra site acaba indo no próximo da lista, diz o que entrega (site rápido, com botão direto pro WhatsApp){prazo}, cita o exemplo que vai logo abaixo e propõe 10 minutos de conversa.
+
+MODELO C — Google Meu Negócio (empresa que JÁ tem site, ou com nota/avaliações fracas):
+abre com "Não sei se é com você que trato esse assunto, mas queria te fazer uma pergunta rápida sobre a {empresa}.", cita o dado concreto do perfil que estiver nos dados (nota, número de avaliações) e explica que é por esse perfil que o cliente decide pra quem ligar; diz que o trabalho dela é deixar o perfil completo e bem posicionado nas buscas da região; oferece um diagnóstico rápido e gratuito ("Toparia ver?").
+
+MODELO D — Posts/Instagram (quando os dados indicarem foco em Instagram/redes sociais):
+diz em 1 frase que cria posts que deixam o perfil atualizado e que vendem, pergunta se estão satisfeitos com o Instagram hoje e se é com essa pessoa mesmo que trata disso.
+
+MODELO E — Site + Google (sem site E perfil fraco): junte B e C em poucas frases, uma única pergunta no final.
+
+REGRAS (obrigatórias):
+- Português do Brasil, tom humano e direto, como se a Rafaella escrevesse pessoalmente. 90 a 150 palavras no corpo.
+- Comece com "Olá, {saudacao}tudo bem?" e diga "Sou a Rafaella" UMA única vez. Termine EXATAMENTE com a linha "Um abraço!" (sem nome, sem assinatura).
+- NUNCA invente: clientes atendidos, resultados, números, prazos, preços ou dados que não estejam abaixo. Se não houver nota/avaliações nos dados, não cite números.
+- NUNCA cite concorrentes pelo nome nem diga que concorrentes aparecem na frente.
+- NÃO escreva links, URLs, colchetes ou placeholders: a demonstração e o botão do WhatsApp são inseridos automaticamente logo antes de "Um abraço!". Pode dizer "deixei uma demonstração logo abaixo" SOMENTE se houver demonstração.
+- Sem CAIXA ALTA, sem emojis, sem exclamações em excesso, sem promessas exageradas.
+- Assunto: 2 a 5 palavras, minúsculas (exceto o nome da empresa), sem pontuação de impacto. Ex.: "ideia pro site da {empresa}", "{empresa} no Google".
+Responda SOMENTE com JSON: {"modelo": "A|B|C|D|E", "assunto": "...", "corpo": "..."}"""
+
+
+async def ai_opener(playbook: dict, info: dict, first: str, demo_kind: str, has_demo: bool) -> Optional[tuple]:
+    """Sofia escolhe o melhor modelo para a empresa e escreve o e-mail. None = usar o texto fixo."""
+    prazo = (playbook.get("delivery_time") or "").strip()
+    system = (OPENER_SYSTEM
+              .replace("{prazo}", f" e que entrega {prazo}" if prazo else "")
+              .replace("{saudacao}", f"{first}, " if first else "")
+              .replace("{empresa}", info.get("empresa") or "sua empresa"))
+    dados = {k: v for k, v in info.items() if v}
+    dados["tipo_de_demonstracao"] = (demo_kind if has_demo else "nenhuma")
+    try:
+        raw = await bot._gemini(system, json.dumps(dados, ensure_ascii=False), json_mode=True, temperature=0.8)
+        txt = raw[raw.find("{"): raw.rfind("}") + 1]
+        out = json.loads(txt)
+        subject = re.sub(r"\s+", " ", str(out.get("assunto", ""))).strip()[:80]
+        body = str(out.get("corpo", "")).strip()
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger(__name__).warning("Abordagem por IA falhou, usando texto fixo: %s", exc)
+        return None
+    body = body.replace("\r", "")
+    if not subject or not body or re.search(r"https?://|www\.|\[|\{|\}", body + subject):
+        return None
+    words = len(body.split())
+    if words < 40 or words > 260:
+        return None
+    if "Um abraço!" not in body:
+        body = body.rstrip() + "\n\nUm abraço!"
+    return subject, body
+
+
 @router.get("/status")
 async def email_status(_: str = Depends(require_session)):
     return {
@@ -125,9 +189,29 @@ async def outreach(payload: EmailOutreach, _: str = Depends(require_session)):
     body = body.replace("Olá, {nome}, tudo bem?", "Olá, tudo bem?") if not first else body.replace("{nome}", first)
 
     demo, demo_kind = pick_demo_link(playbook.get("demo_links") or "", payload.niche, payload.business)
+    ai_used = False
+    if playbook.get("email_ai", True):
+        lead = await db.imported_leads.find_one({"id": payload.import_id}) if payload.import_id else None
+        lead = lead or {}
+        info = {
+            "empresa": empresa,
+            "nicho": payload.niche or lead.get("niche"),
+            "servico_recomendado": payload.service,
+            "site": lead.get("website"),
+            "nota_google": lead.get("rating"),
+            "avaliacoes_google": lead.get("reviews"),
+            "cidade": lead.get("city"),
+            "analise": lead.get("reason"),
+        }
+        written = await ai_opener(playbook, info, first, demo_kind, bool(demo))
+        if written:
+            subject, body = written
+            ai_used = True
     wa = whatsapp_link(playbook.get("whatsapp_number") or "", empresa)
     extra = ""
-    if demo and demo_kind == "app":
+    if demo and ai_used:
+        extra += f"{demo}\n\n"  # o texto da Sofia já apresenta a demonstração; aqui vira só o botão
+    elif demo and demo_kind == "app":
         extra += (
             "Pra você ter uma ideia concreta, preparei a demonstração de um sistema de agendamento online: "
             "o cliente escolhe o serviço, o dia e o horário, e o pedido chega organizado direto no WhatsApp "
